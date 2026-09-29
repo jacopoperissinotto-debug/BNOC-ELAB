@@ -52,6 +52,7 @@ export function renderAdmin(el) {
         <input type="datetime-local" id="ad-close" value="${toLocalInput(defaultClose())}">
         <div class="hint">Answers lock automatically at this time. Suggestions you publish below use it too.</div></div>
       <button class="primary" data-act="post">Post call</button>
+      <button class="secondary" data-act="post-ideas">Post all ${IDEAS.length} ideas at once</button>
       <div id="admin-lists"><div class="empty">Loading…</div></div>
       <button class="secondary" data-act="forget-key" style="margin-top:24px">Forget the admin key on this device</button>`
     : `
@@ -148,6 +149,33 @@ async function post(btn, fromSuggestion) {
   toast(`Posted. Closes ${fmtWhen(closesAt)}`);
 }
 
+// Posts every idea that isn't already a call, all closing at the time chosen above.
+async function postIdeas(btn) {
+  const err = root.querySelector('#ad-err');
+  clearError(err);
+  const closesAt = closeTime();
+  if (!closesAt) return showError(err, 'Pick when the calls close.');
+  const existing = new Set((A.data?.calls || []).map(c => c.q.trim().toLowerCase()));
+  const todo = IDEAS.filter(q => !existing.has(q.toLowerCase()));
+  if (!todo.length) return toast('All the ideas are already posted');
+  if (!confirm(`Post ${todo.length} calls, all closing ${fmtWhen(closesAt)}?`)) return;
+  btn.disabled = true;
+  let posted = 0;
+  for (const q of todo) {
+    const { data, error, status } = await api.admin.createCall(q, closesAt);
+    if (error) {
+      btn.disabled = false;
+      if (status === 401 || status === 503) return handleError(error, status);
+      return showError(err, `${error} (${posted} of ${todo.length} posted)`);
+    }
+    A.data = data;
+    posted++;
+  }
+  btn.disabled = false;
+  root.querySelector('#admin-lists').innerHTML = listsHtml();
+  toast(`Posted ${posted} calls. Closing ${fmtWhen(closesAt)}`);
+}
+
 async function update(btn, id, action, extra, doneMsg) {
   btn.disabled = true;
   const { data, error, status } = await api.admin.updateCall(id, action, extra);
@@ -195,6 +223,7 @@ document.addEventListener('click', e => {
     case 'idea': root.querySelector('#ad-q').value = IDEAS[Number(b.dataset.i)]; root.querySelector('#ad-q').focus(); break;
     case 'preset': root.querySelector('#ad-close').value = toLocalInput(preset(b.dataset.k)); break;
     case 'post': post(b); break;
+    case 'post-ideas': postIdeas(b); break;
     case 'publish': post(b, id); break;
     case 'reject':
       if (confirm('Reject this suggestion? It will be deleted.')) {
