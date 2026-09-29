@@ -33,6 +33,8 @@ Rules the back end enforces: answers are locked once made; no answers after a ca
 
 ## Deploy (Netlify + GitHub)
 
+The GitHub repo (jacopoperissinotto-debug/BNOC-ELAB) is **public**: Netlify's free plan only builds private repos for one Git contributor. There are no secrets in the code; `ADMIN_KEY` lives only in Netlify.
+
 1. Push this repository to GitHub.
 2. In Netlify: **Project configuration → Build & deploy → Continuous deployment → Link repository**, choose the repo, branch `main`. Build settings come from `netlify.toml`.
 3. In Netlify: **Environment variables → Add a variable**: key `ADMIN_KEY`, value a long passphrase only admins know. Redeploy after adding it.
