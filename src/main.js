@@ -110,24 +110,21 @@ function sparkline(trend) {
     <line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" class="mid"/><path d="${d}"/><circle cx="${f(ex)}" cy="${f(ey)}" r="2.5"/></svg>`;
 }
 
-// The crowd forecast as a probability, always about the answer that matters to you: your own call
-// if you made one, otherwise whichever answer is ahead. It takes that answer's colour everywhere
-// (first answer = coral, second = plum), matching the buttons and the "You called" tag.
+// The crowd forecast as a probability, the same for everyone so people can talk about one number.
+// It always tracks the first answer ("63% chance it happens", "38% chance of Less than 50"), so the
+// number and graph never flip meaning when the lead changes. Your own odds are shown separately,
+// in your "You called" row, in your answer's colour.
 function forecastBlock(c) {
   if (!c.total) return `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`;
   if (c.hidden) return `<div class="bar bar-empty fc-locked">${LOCK}Make your call to see the crowd forecast</div>`;
   const yesNo = c.options[0] === 'Yes' && c.options[1] === 'No';
-  const focus = c.mine ? c.mine.pick : (c.forecast >= 50 ? 0 : 1);
-  const pct = focus === 0 ? c.forecast : 100 - c.forecast;
-  const trend = focus === 0 ? c.trend : c.trend.map(v => 100 - v);
-  const what = yesNo
-    ? (focus === 0 ? 'chance it happens' : "chance it doesn't happen")
-    : `chance of ${esc(answer(c, focus))}`;
+  const pct = c.forecast, trend = c.trend;
+  const what = yesNo ? 'chance it happens' : `chance of ${esc(answer(c, 0))}`;
   const early = c.total < EARLY_READ;
   const status = c.status === 'open'
     ? '<span class="live"><i aria-hidden="true"></i>Updated live</span>'
     : '<span class="live off">Final forecast</span>';
-  return `<div class="fc pick-${focus} ${early ? 'early' : ''}" role="img" aria-label="Crowd forecast: ${pct}% ${what}${early ? ', early read' : ''}">
+  return `<div class="fc ${early ? 'early' : ''}" role="img" aria-label="Crowd forecast: ${pct}% ${what}${early ? ', early read' : ''}">
       <div class="fc-top">
         <div class="fc-main">
           <div><span class="fc-num">${pct}%</span>${early ? '<span class="early-pill">Early read</span>' : ''}</div>
@@ -156,7 +153,10 @@ function callCard(c) {
     action = `<div class="vote"><button class="yes" data-act="call" data-id="${c.id}" data-pick="0">${esc(answer(c, 0))}</button><button class="no" data-act="call" data-id="${c.id}" data-pick="1">${esc(answer(c, 1))}</button></div>`;
   } else if (c.mine && c.status !== 'settled') {
     const cf = CONF[c.mine.conf];
-    action = `<div class="my-stake"><span>You called ${tag(c, c.mine.pick)} · ${cf.label}</span><span class="locked">Locked in</span></div>`;
+    // Your personal odds: the crowd's chance of the answer you picked, in that answer's colour.
+    const myPct = c.forecast === null || c.forecast === undefined ? null : c.mine.pick === 0 ? c.forecast : 100 - c.forecast;
+    const right = myPct === null ? '<span class="locked">Locked in</span>' : `<span class="my-odds pick-${c.mine.pick}">${myPct}% chance</span>`;
+    action = `<div class="my-stake"><span>You called ${tag(c, c.mine.pick)} · ${cf.label}</span>${right}</div>`;
   }
   const when = c.status === 'open' ? `Closes ${fmtWhen(c.closesAt)}` : c.status === 'closed' ? `Closed ${fmtWhen(c.closesAt)}` : 'Settled';
   return `<article class="call">
