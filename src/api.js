@@ -43,6 +43,7 @@ export const api = {
     updateCall: (id, action, extra = {}) => call('POST', `admin/calls/${id}`, { action, ...extra }, { admin: true }),
     rejectSuggestion: id => call('POST', `admin/suggestions/${id}`, {}, { admin: true }),
     removePerson: id => call('POST', `admin/people/${id}`, {}, { admin: true }),
+    saveReward: reward => call('POST', 'admin/reward', reward, { admin: true }),
     comments: callId => call('GET', `admin/comments/${callId}`, null, { admin: true }),
     removeComment: (callId, commentId) => call('POST', `admin/comments/${callId}/${commentId}`, {}, { admin: true })
   }

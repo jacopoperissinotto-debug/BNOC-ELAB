@@ -290,3 +290,8 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .conf button[aria-pressed="true"] .dots i.on{background:var(--mint)}
 .conf-note{font-size:13.5px;line-height:1.45;color:var(--muted);text-align:center;margin:-2px 8px 16px}
 .my-stake .locked{font-weight:700;color:var(--muted);white-space:nowrap}
+
+/* Rewards */
+.chal.reward{background:var(--coral)}
+.chal.reward .fine{opacity:.9}
+.chal .prize svg{color:#fff}

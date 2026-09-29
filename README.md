@@ -15,7 +15,7 @@ A free-to-play forecasting app for the King's E-Lab pilot. People make yes/no ca
 | Who | What they do |
 |---|---|
 | Everyone | Open bnoc.netlify.app (or scan the QR), type first name and @cam.ac.uk email, make calls, comment |
-| Admin | Opens **bnoc.netlify.app/#/admin**, types the admin key, posts calls (two answers each: Yes/No or custom labels) with a closing time, closes and settles them, removes comments or people |
+| Admin | Opens **bnoc.netlify.app/#/admin**, types the admin key, posts calls (two answers each: Yes/No or custom labels) with a closing time, closes and settles them, sets the prize shown on the Rewards tab, removes comments or people |
 
 Scoring (worked out by the back end, never the browser):
 

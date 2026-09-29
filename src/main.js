@@ -5,7 +5,9 @@ import { $, esc, ord, toast, openSheet, closeSheet, showError, clearError, avata
 import { CONF, COMMUNITY, isCamEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../shared/rules.js';
 import { renderAdmin, refreshAdmin } from './admin.js';
 
-const TABS = ['calls', 'ranks', 'how', 'me', 'admin'];
+const TABS = ['calls', 'ranks', 'rewards', 'how', 'me', 'admin'];
+const GELATO = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11a5 5 0 0 1 10 0"/><path d="M6 11h12l-6 11z"/></svg>';
+const STAR = '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg>';
 const REFRESH_MS = 15000;
 const COMMENTS_REFRESH_MS = 6000;
 const COMMENT_MAX = 280;
@@ -75,7 +77,7 @@ function render() {
   document.querySelectorAll('#nav [data-tab]').forEach(b => {
     if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  $('#content').innerHTML = ({ calls: renderCalls, ranks: renderRanks, how: renderHow, me: renderMe })[S.tab]();
+  $('#content').innerHTML = ({ calls: renderCalls, ranks: renderRanks, rewards: renderRewards, how: renderHow, me: renderMe })[S.tab]();
 }
 
 function renderAdminPage() {
@@ -285,6 +287,28 @@ function renderRanks() {
     <div class="banner"><span aria-hidden="true">★</span><span><b>You're ${ord(S.state.rank)} of ${S.state.people}.</b> Honest confidence scores best over a season.</span></div>
     <div class="podium">${pod(b[1], '')}${pod(b[0], 'first')}${pod(b[2], '')}</div>
     ${b.slice(3).map(x => row(x, x.rank)).join('')}`;
+}
+
+// ---------- Rewards ----------
+function renderRewards() {
+  const r = S.state.reward, s = S.state;
+  const standing = !s.settled
+    ? `<b>No results yet.</b> ${s.people} ${s.people === 1 ? 'person is' : 'people are'} playing. Points land when the first call is settled.`
+    : `<b>You're ${ord(s.rank)} of ${s.people}</b> with ${s.score} ${Math.abs(s.score) === 1 ? 'point' : 'points'}.${s.rank === 1 ? ' Top of the table: hold on to it!' : ''}`;
+  const prize = r ? `<article class="chal reward">
+      ${r.sponsor ? `<div class="biz"><span class="logo">${GELATO}</span>${esc(r.sponsor)}</div>` : ''}
+      <h3>${esc(r.prize)}</h3>
+      ${r.who ? `<p>${esc(r.who)}</p>` : ''}
+      ${r.when ? `<span class="prize">${STAR} ${esc(r.when)}</span>` : ''}
+      <div class="chal-actions"><button data-act="tab" data-tab="ranks">See the leaderboard</button></div>
+      ${r.details ? `<div class="fine">${esc(r.details)}</div>` : ''}
+    </article>`
+    : '<div class="empty">No reward right now. Keep calling: the next one is on its way.</div>';
+  return `<h1 class="page-title">Rewards</h1>
+    <p class="page-sub">Top the ${esc(COMMUNITY.name)} table to win. Free to play: nothing to buy, nothing to cash out.</p>
+    ${prize}
+    <div class="banner"><span aria-hidden="true">${STAR}</span><span>${standing}</span></div>
+    <button class="secondary" data-act="tab" data-tab="how">How scoring works</button>`;
 }
 
 // ---------- Rules ----------

@@ -18,6 +18,7 @@
 //   fx/{callId}/{uid}/{pick}/{conf}/{at}               the same answer as a key, so one list() counts everything
 //   suggestion/{id}            { id, q, uid, name, at }
 //   comment/{callId}/{at}.{uid}.{cid}  { cid, uid, pid, name, text, at }   comments on a call, oldest first
+//   config/reward              { prize, sponsor, who, when, details }       the prize on the Rewards page (set by admin)
 import { getStore } from '@netlify/blobs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { CONF, isCamEmail, normaliseEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../../shared/rules.js';
@@ -81,7 +82,8 @@ async function loadWorld(st) {
     if (!prev || f.at < prev.at) first.set(`${callId}/${uid}`, f);
   }
   const forecasts = [...first.values()];
-  const world = { calls: calls.filter(Boolean), users: users.filter(Boolean), forecasts, commentCounts };
+  const reward = await st.get('config/reward', { type: 'json' });
+  const world = { calls: calls.filter(Boolean), users: users.filter(Boolean), forecasts, commentCounts, reward };
   cached = { at: Date.now(), world };
   return world;
 }
@@ -158,7 +160,8 @@ function publicState(world, me) {
     score: mine?.score || 0,
     rank: mine?.rank || 0,
     people: board.length,
-    settled: calls.filter(c => c.status === 'settled').length
+    settled: calls.filter(c => c.status === 'settled').length,
+    reward: world.reward || null
   };
 }
 
@@ -315,6 +318,23 @@ async function removeComment(st, callId, commentId, me, admin) {
   return json(200, { comments: await listComments(st, callId, me) });
 }
 
+// ---------- Reward (the prize shown on the Rewards page) ----------
+async function saveReward(st, body) {
+  const reward = {
+    prize: clean(body.prize, 60),
+    sponsor: clean(body.sponsor, 40),
+    who: clean(body.who, 80),
+    when: clean(body.when, 80),
+    details: clean(body.details, 300)
+  };
+  if (!reward.prize) {
+    await st.delete('config/reward');   // an empty prize means "no reward right now"
+  } else {
+    await st.setJSON('config/reward', reward);
+  }
+  return adminState(st);
+}
+
 // ---------- Admin ----------
 function parseClose(v) {
   const t = Date.parse(v);
@@ -331,6 +351,7 @@ async function adminState(st) {
   return json(200, {
     calls: world.calls.filter(c => !c.void).sort(callOrder).map(c => callSummary(world, c)),
     suggestions,
+    reward: world.reward || null,
     people: board.map(({ id, name, score, rank }) => ({ id, name, score, rank, email: world.users.find(u => u.id === id)?.email }))
   });
 }
@@ -420,6 +441,7 @@ export default async (req) => {
         await deleteUser(st, user);
         return adminState(st);
       }
+      if (route === 'POST admin/reward') return saveReward(st, body);
       if (route === 'GET admin/comments' && parts[2]) return json(200, { comments: await listComments(st, parts[2], null) });
       if (route === 'POST admin/comments' && parts[2] && parts[3]) return removeComment(st, parts[2], parts[3], null, true);
       if (route === 'POST admin/suggestions' && parts[2]) {

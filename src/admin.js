@@ -4,7 +4,20 @@ import QRCode from 'qrcode';
 import { api, getAdminKey, setAdminKey } from './api.js';
 import { esc, toast, showError, clearError, fmtWhen } from './ui.js';
 
-const A = { data: null, error: null, openComments: new Set(), comments: {} };
+const A = { data: null, error: null, openComments: new Set(), comments: {}, rewardFilled: false };
+
+// Suggested wording for the Rewards page; the admin can change any of it before saving.
+const REWARD_DEFAULTS = {
+  prize: 'A free gelato from Jack\'s Gelato',
+  sponsor: 'Jack\'s Gelato',
+  who: 'For whoever tops the King\'s E-Lab leaderboard.',
+  when: 'Winner announced when the pilot ends',
+  details: 'Free to play, nothing to buy. If there\'s a tie at the top, the E-Lab team will run a tiebreak call.'
+};
+const REWARD_FIELDS = [
+  ['prize', 'Prize', 60], ['sponsor', 'From (business or person)', 40], ['who', 'Who wins', 80],
+  ['when', 'When', 80], ['details', 'Small print', 300]
+];
 
 // Ready-made questions for the pitch. Tap one to fill the question box, then edit before posting.
 const IDEAS = [
@@ -61,6 +74,14 @@ export function renderAdmin(el) {
         <div class="hint">Answers lock automatically at this time. Suggestions you publish below use it too.</div></div>
       <button class="primary" data-act="post">Post call</button>
       <button class="secondary" data-act="post-ideas">Post all ${IDEAS.length} ideas at once</button>
+      <h2 class="section-h">Reward</h2>
+      <p class="page-sub" id="rw-status" style="margin-bottom:10px">Shown on everyone's Rewards tab.</p>
+      <div class="err" id="rw-err" role="alert"></div>
+      ${REWARD_FIELDS.map(([k, label, max]) => `<div class="field"><label for="rw-${k}">${label}</label>${k === 'details'
+        ? `<textarea id="rw-${k}" maxlength="${max}"></textarea>`
+        : `<input type="text" id="rw-${k}" maxlength="${max}">`}</div>`).join('')}
+      <button class="primary dark" data-act="save-reward">Save reward</button>
+      <button class="secondary" data-act="clear-reward">Take the reward down</button>
       <div id="admin-lists"><div class="empty">Loading…</div></div>
       <button class="secondary" data-act="forget-key" style="margin-top:24px">Forget the admin key on this device</button>`
     : `
@@ -69,7 +90,36 @@ export function renderAdmin(el) {
         <div class="hint">The passphrase saved as ADMIN_KEY in Netlify. This device remembers it.</div></div>
       <button class="primary dark" data-act="save-key">Open admin</button>`}
   </div>`;
+  A.rewardFilled = false;
   if (hasKey) refreshAdmin();
+}
+
+// Fill the reward form once (not on every refresh, so typing isn't overwritten).
+function fillReward() {
+  const status = root.querySelector('#rw-status');
+  if (status) status.textContent = A.data.reward
+    ? 'Live now on everyone\'s Rewards tab.'
+    : 'Not published yet. Check the wording below, then Save reward.';
+  if (A.rewardFilled || !root.querySelector('#rw-prize')) return;
+  const r = A.data.reward || REWARD_DEFAULTS;
+  for (const [k] of REWARD_FIELDS) root.querySelector(`#rw-${k}`).value = r[k] || '';
+  A.rewardFilled = true;
+}
+
+async function saveReward(btn, clear) {
+  const err = root.querySelector('#rw-err');
+  clearError(err);
+  const body = {};
+  for (const [k] of REWARD_FIELDS) body[k] = clear ? '' : root.querySelector(`#rw-${k}`).value.trim();
+  if (!clear && !body.prize) return showError(err, 'Write the prize, e.g. "A free gelato from Jack\'s Gelato".');
+  btn.disabled = true;
+  const { data, error, status } = await api.admin.saveReward(body);
+  btn.disabled = false;
+  if (error) return status === 401 || status === 503 ? handleError(error, status) : showError(err, error);
+  A.data = data;
+  if (clear) { A.rewardFilled = false; }
+  fillReward();
+  toast(clear ? 'Reward taken down' : 'Reward saved. It\'s on everyone\'s Rewards tab.');
 }
 
 export async function refreshAdmin() {
@@ -77,6 +127,7 @@ export async function refreshAdmin() {
   const { data, error, status } = await api.admin.state();
   if (error) return handleError(error, status);
   A.data = data; A.error = null;
+  fillReward();
   await Promise.all([...A.openComments].map(fetchComments));
   const lists = root.querySelector('#admin-lists');
   if (lists) lists.innerHTML = listsHtml();
@@ -332,6 +383,10 @@ document.addEventListener('click', e => {
           toast('Comment removed');
         });
       }
+      break;
+    case 'save-reward': saveReward(b, false); break;
+    case 'clear-reward':
+      if (confirm('Take the reward down? The Rewards tab will say there\'s no reward right now.')) saveReward(b, true);
       break;
     case 'qr': showQr(); break;
     case 'qr-close': closeQr(); break;
