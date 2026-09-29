@@ -103,8 +103,10 @@ function callCard(c) {
     <div class="call-meta">${KE_AVATAR}<span><b>${esc(COMMUNITY.name)}</b> · official call</span></div>
     <h3>${esc(c.q)}</h3>
     ${chips ? `<div class="chips">${chips}</div>` : ''}
-    <div class="bar" role="img" aria-label="The crowd says ${p}% Yes"><div class="y" style="width:${Math.min(Math.max(p, 16), 84)}%">Yes ${p}%</div><div class="n">No ${100 - p}%</div></div>
-    <div class="call-foot"><span>${total} ${total === 1 ? 'person' : 'people'} called it · ${when}</span></div>
+    ${total
+      ? `<div class="bar" role="img" aria-label="The crowd says ${p}% Yes"><div class="y" style="width:${Math.min(Math.max(p, 16), 84)}%">Yes ${p}%</div><div class="n">No ${100 - p}%</div></div>`
+      : `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`}
+    <div class="call-foot"><span>${total ? `${total} ${total === 1 ? 'person' : 'people'} called it · ` : ''}${when}</span></div>
     ${action}
   </article>`;
 }
@@ -188,12 +190,20 @@ async function sendSuggestion(btn) {
 function renderRanks() {
   const b = S.state.board, myId = me().id;
   const label = x => x.id === myId ? 'You' : x.name;
-  const pod = (x, place, cls) => x ? `<div class="pod ${cls}">${avatar(x.id, x.name)}<div class="n">${esc(label(x))}</div><div class="s">${x.score}</div><div class="place">${ord(place)}</div></div>` : '<div></div>';
-  return `<h1 class="page-title">Ranks</h1>
-    <p class="page-sub">Season 1 in ${esc(COMMUNITY.name)}. Points land when a call is settled.</p>
+  const row = (x, rank) => `<div class="row ${x.id === myId ? 'me' : ''}"><span class="rank">${rank}</span>${avatar(x.id, x.name)}<span class="who">${esc(x.id === myId ? `${x.name} (you)` : x.name)}</span><span class="sc">${x.score}</span></div>`;
+  const head = `<h1 class="page-title">Ranks</h1>
+    <p class="page-sub">Season 1 in ${esc(COMMUNITY.name)}. Points land when a call is settled.</p>`;
+  // Before the first result everyone is on 0, so there's no podium yet: just who's playing.
+  if (!S.state.settled) {
+    return `${head}
+      <div class="banner"><span aria-hidden="true">★</span><span><b>No results yet.</b> The table fills up once the first call is settled. ${S.state.people} ${S.state.people === 1 ? 'person is' : 'people are'} playing.</span></div>
+      ${b.map(x => row(x, '–')).join('')}`;
+  }
+  const pod = (x, cls) => x ? `<div class="pod ${cls}">${avatar(x.id, x.name)}<div class="n">${esc(label(x))}</div><div class="s">${x.score}</div><div class="place">${ord(x.rank)}</div></div>` : '<div></div>';
+  return `${head}
     <div class="banner"><span aria-hidden="true">★</span><span><b>You're ${ord(S.state.rank)} of ${S.state.people}.</b> Honest confidence scores best over a season.</span></div>
-    <div class="podium">${pod(b[1], 2, '')}${pod(b[0], 1, 'first')}${pod(b[2], 3, '')}</div>
-    ${b.slice(3).map((x, i) => `<div class="row ${x.id === myId ? 'me' : ''}"><span class="rank">${i + 4}</span>${avatar(x.id, x.name)}<span class="who">${esc(x.id === myId ? `${x.name} (you)` : x.name)}</span><span class="sc">${x.score}</span></div>`).join('')}`;
+    <div class="podium">${pod(b[1], '')}${pod(b[0], 'first')}${pod(b[2], '')}</div>
+    ${b.slice(3).map(x => row(x, x.rank)).join('')}`;
 }
 
 // ---------- Rules ----------
@@ -227,7 +237,7 @@ function renderMe() {
     return `<li><span>Called ${sideLabel(c.mine.side)} (${CONF[c.mine.conf].label.toLowerCase()}): ${esc(short)}</span><span>·</span></li>`;
   });
   return `<h1 class="page-title">Me</h1>
-    <div class="balance"><div class="big">${s.score}</div><div class="lbl">season score · ${ord(s.rank)} of ${s.people} in ${esc(COMMUNITY.name)}</div>
+    <div class="balance"><div class="big">${s.score}</div><div class="lbl">season score · ${s.settled ? `${ord(s.rank)} of ${s.people}` : 'no results yet'} in ${esc(COMMUNITY.name)}</div>
       <div class="fine">Signed in as ${esc(m.name)} · ${esc(m.email)}</div></div>
     <h2 class="section-h">Activity</h2>
     ${log.length ? `<ul class="log">${log.join('')}</ul>` : '<div class="empty">No calls yet. Your results will show up here.</div>'}

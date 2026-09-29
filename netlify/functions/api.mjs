@@ -6,7 +6,9 @@
 //   - only someone with the ADMIN_KEY (a Netlify environment variable) can create, close or settle calls
 //
 // Stored keys:
-//   user/{uid}                 { id, name, email, createdAt, sessions: [hash] }
+//   user/{uid}                 { id, pid, name, email, createdAt, sessions: [hash] }
+//                              uid is worked out from the email (so two joins at once can't make two
+//                              accounts); pid is a random id, the only one phones ever see.
 //   email/{sha(email)}         { uid }                  one account per email
 //   session/{sha(token)}       { uid }                  "this phone is logged in as…"
 //   call/{id}                  { id, q, closesAt, createdAt, result, settledAt, void }
@@ -45,10 +47,16 @@ async function loadWorld(st) {
     Promise.all(callKeys.map(k => st.get(k, { type: 'json' }))),
     Promise.all(userKeys.map(k => st.get(k, { type: 'json' })))
   ]);
-  const forecasts = fxKeys.map(k => {
+  // One answer per person per call: if two ever slip through at the same instant, the first one counts.
+  const first = new Map();
+  for (const k of fxKeys) {
     const [, callId, uid, side, conf, at] = k.split('/');
-    return { callId, uid, side, conf, at: Number(at) };
-  }).filter(f => CONF[f.conf] && (f.side === 'yes' || f.side === 'no'));
+    const f = { callId, uid, side, conf, at: Number(at) };
+    if (!CONF[f.conf] || (f.side !== 'yes' && f.side !== 'no')) continue;
+    const prev = first.get(`${callId}/${uid}`);
+    if (!prev || f.at < prev.at) first.set(`${callId}/${uid}`, f);
+  }
+  const forecasts = [...first.values()];
   const world = { calls: calls.filter(Boolean), users: users.filter(Boolean), forecasts };
   cached = { at: Date.now(), world };
   return world;
@@ -61,8 +69,11 @@ function statusOf(c, now = Date.now()) {
   return now >= Date.parse(c.closesAt) ? 'closed' : 'open';
 }
 
+// An answer counts only if it was made before the call closed.
+const inTime = (f, c) => f.at <= Date.parse(c.closesAt);
+
 function pointsFor(f, c) {
-  if (!c || c.void || !c.result) return null;
+  if (!c || c.void || !c.result || !inTime(f, c)) return null;
   const cf = CONF[f.conf];
   return f.side === c.result ? cf.win : -cf.lose;
 }
@@ -74,9 +85,12 @@ function scoreboard(world) {
     const p = pointsFor(f, callById.get(f.callId));
     if (p !== null && score.has(f.uid)) score.set(f.uid, score.get(f.uid) + p);
   }
-  return world.users
-    .map(u => ({ id: u.id, name: u.name, score: score.get(u.id) || 0, joined: u.createdAt }))
-    .sort((a, b) => b.score - a.score || a.joined.localeCompare(b.joined));
+  const rows = world.users
+    .map(u => ({ id: u.id, pid: u.pid || u.id, name: u.name, score: score.get(u.id) || 0, joined: u.createdAt }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  // Tied scores share a place: 30, 30, 20 → 1st, 1st, 3rd.
+  rows.forEach((r, i) => { r.rank = i && r.score === rows[i - 1].score ? rows[i - 1].rank : i + 1; });
+  return rows;
 }
 
 function callOrder(a, b) {
@@ -87,8 +101,8 @@ function callOrder(a, b) {
   return Date.parse(a.closesAt) - Date.parse(b.closesAt);
 }
 
-function tally(world, callId) {
-  const fs = world.forecasts.filter(f => f.callId === callId);
+function tally(world, call) {
+  const fs = world.forecasts.filter(f => f.callId === call.id && inTime(f, call));
   const yes = fs.filter(f => f.side === 'yes').length;
   return { yes, no: fs.length - yes };
 }
@@ -97,21 +111,22 @@ function tally(world, callId) {
 function publicState(world, me) {
   const board = scoreboard(world);
   const calls = world.calls.filter(c => !c.void).sort(callOrder).map(c => {
-    const mineF = me && world.forecasts.find(f => f.callId === c.id && f.uid === me.id);
+    const mineF = me && world.forecasts.find(f => f.callId === c.id && f.uid === me.id && inTime(f, c));
     return {
       id: c.id, q: c.q, closesAt: c.closesAt, status: statusOf(c), result: c.result || null,
-      ...tally(world, c.id),
+      ...tally(world, c),
       mine: mineF ? { side: mineF.side, conf: mineF.conf, pts: pointsFor(mineF, c) } : null
     };
   });
-  const rank = me ? board.findIndex(r => r.id === me.id) + 1 : 0;
+  const mine = me && board.find(r => r.id === me.id);
   return {
-    me: me ? { id: me.id, name: me.name, email: me.email } : null,
+    me: me ? { id: me.pid || me.id, name: me.name, email: me.email } : null,
     calls,
-    board: board.map(({ id, name, score }) => ({ id, name, score })),
-    score: me ? (board.find(r => r.id === me.id)?.score || 0) : 0,
-    rank,
-    people: board.length
+    board: board.map(({ pid, name, score, rank }) => ({ id: pid, name, score, rank })),
+    score: mine?.score || 0,
+    rank: mine?.rank || 0,
+    people: board.length,
+    settled: calls.filter(c => c.status === 'settled').length
   };
 }
 
@@ -129,10 +144,11 @@ async function currentUser(st, req) {
   return st.get(`user/${sess.uid}`, { type: 'json' });
 }
 
+const adminKey = () => (process.env.ADMIN_KEY || '').trim();
+
 function isAdmin(req) {
-  const key = process.env.ADMIN_KEY || '';
-  if (key.length < 8) return false;
-  const given = req.headers.get('x-admin-key') || '';
+  const key = adminKey();
+  const given = (req.headers.get('x-admin-key') || '').trim();
   return timingSafeEqual(Buffer.from(sha(key)), Buffer.from(sha(given)));
 }
 
@@ -150,16 +166,12 @@ async function join(st, body) {
   const existing = await st.get(emailKey, { type: 'json' });
   if (existing) user = await st.get(`user/${existing.uid}`, { type: 'json' });
   if (!user) {
-    const uid = existing?.uid || newId();
-    const claimed = existing ? { modified: true } : await st.setJSON(emailKey, { uid }, { onlyIfNew: true });
-    if (!claimed.modified) {
-      // Someone joined with this email a split second earlier: use that account.
-      const winner = await st.get(emailKey, { type: 'json' });
-      user = await st.get(`user/${winner.uid}`, { type: 'json' });
-    }
-    if (!user) {
-      user = { id: uid, name, email, createdAt: new Date().toISOString(), sessions: [] };
-    }
+    // Every join with this email arrives at the same uid, so a double-tapped Join
+    // (or two phones at once) can never create two accounts.
+    const uid = existing?.uid || sha(`bnoc-user:${email}`).slice(0, 24);
+    if (!existing) await st.setJSON(emailKey, { uid });
+    user = await st.get(`user/${uid}`, { type: 'json' })
+      || { id: uid, pid: newId(), name, email, createdAt: new Date().toISOString(), sessions: [] };
   }
 
   const token = randomBytes(24).toString('base64url');
@@ -199,7 +211,12 @@ async function forecast(st, me, body) {
   const at = Date.now();
   const first = await st.setJSON(`f/${call.id}/${me.id}`, { side, conf, at }, { onlyIfNew: true });
   if (!first.modified) return fail(409, "You've already made this call. Calls are locked once made.");
-  await st.set(`fx/${call.id}/${me.id}/${side}/${conf}/${at}`, '1');
+  try {
+    await st.set(`fx/${call.id}/${me.id}/${side}/${conf}/${at}`, '1');
+  } catch (err) {
+    await st.delete(`f/${call.id}/${me.id}`).catch(() => {});
+    throw err;
+  }
   forget();
   return json(200, { state: publicState(await loadWorld(st), me) });
 }
@@ -229,10 +246,10 @@ async function adminState(st) {
     .filter(Boolean).sort((a, b) => b.at.localeCompare(a.at));
   return json(200, {
     calls: world.calls.filter(c => !c.void).sort(callOrder).map(c => ({
-      id: c.id, q: c.q, closesAt: c.closesAt, status: statusOf(c), result: c.result || null, ...tally(world, c.id)
+      id: c.id, q: c.q, closesAt: c.closesAt, status: statusOf(c), result: c.result || null, ...tally(world, c)
     })),
     suggestions,
-    people: board.map(r => ({ ...r, email: world.users.find(u => u.id === r.id)?.email }))
+    people: board.map(({ id, name, score, rank }) => ({ id, name, score, rank, email: world.users.find(u => u.id === id)?.email }))
   });
 }
 
@@ -290,11 +307,12 @@ export default async (req) => {
   const st = getStore({ name: 'bnoc', consistency: 'strong' });
   const parts = new URL(req.url).pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean);
   const route = `${req.method} ${parts[0] || ''}${parts[1] ? '/' + parts[1] : ''}`;
-  const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+  const body = (req.method === 'POST' ? await req.json().catch(() => null) : null) || {};
 
   try {
     if (parts[0] === 'admin') {
-      if (!process.env.ADMIN_KEY) return fail(503, 'Admin is switched off: set ADMIN_KEY in Netlify → Environment variables.');
+      if (!adminKey()) return fail(503, 'Admin is switched off: set ADMIN_KEY in Netlify → Environment variables.');
+      if (adminKey().length < 8) return fail(503, 'The ADMIN_KEY in Netlify is too short: use at least 8 characters.');
       if (!isAdmin(req)) return fail(401, "That admin key isn't right.");
       if (route === 'GET admin') return adminState(st);
       if (route === 'POST admin/calls' && !parts[2]) return createCall(st, body);

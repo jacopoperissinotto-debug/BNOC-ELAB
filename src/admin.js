@@ -124,7 +124,7 @@ function listsHtml() {
         <div class="vote"><button class="yes" data-act="publish" data-id="${s.id}">Publish</button><button class="no" data-act="reject" data-id="${s.id}">Reject</button></div>
       </article>`).join('') : '<div class="empty">No suggestions waiting.</div>'}
     <h2 class="section-h">People (${people.length})</h2>
-    ${people.length ? people.map((p, i) => `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(p.name)}<br><span class="email">${esc(p.email || '')}</span></span><span class="sc">${p.score}</span><button class="report" data-act="remove-person" data-id="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></div>`).join('') : '<div class="empty">Nobody has joined yet.</div>'}`;
+    ${people.length ? people.map(p => `<div class="row"><span class="rank">${p.rank}</span><span class="who">${esc(p.name)}<br><span class="email">${esc(p.email || '')}</span></span><span class="sc">${p.score}</span><button class="report" data-act="remove-person" data-id="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></div>`).join('') : '<div class="empty">Nobody has joined yet.</div>'}`;
 }
 
 function closeTime() {
