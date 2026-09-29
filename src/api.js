@@ -38,6 +38,7 @@ export const api = {
     state: () => call('GET', 'admin', null, { admin: true }),
     createCall: (q, closesAt, fromSuggestion) => call('POST', 'admin/calls', { q, closesAt, fromSuggestion }, { admin: true }),
     updateCall: (id, action, extra = {}) => call('POST', `admin/calls/${id}`, { action, ...extra }, { admin: true }),
-    rejectSuggestion: id => call('POST', `admin/suggestions/${id}`, {}, { admin: true })
+    rejectSuggestion: id => call('POST', `admin/suggestions/${id}`, {}, { admin: true }),
+    removePerson: id => call('POST', `admin/people/${id}`, {}, { admin: true })
   }
 };

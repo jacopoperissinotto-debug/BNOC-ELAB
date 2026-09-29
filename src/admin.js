@@ -5,6 +5,15 @@ import { api, getAdminKey, setAdminKey } from './api.js';
 import { esc, toast, showError, clearError, sideLabel, fmtWhen } from './ui.js';
 
 const A = { data: null, error: null };
+
+// Ready-made questions for the pitch. Tap one to fill the question box, then edit before posting.
+const IDEAS = [
+  'Will this presentation run longer than 3 minutes?',
+  'Will the judges ask us more than 3 questions?',
+  'Will the next team\'s pitch run over time?',
+  'Will more than 20 people join BNOC by midnight tonight?',
+  'Will at least one person get every call right?'
+];
 let root = null;
 
 // datetime-local inputs work in the device's local time (UK for us).
@@ -30,7 +39,9 @@ export function renderAdmin(el) {
       <button class="primary dark" data-act="qr">Show the join QR code</button>
       <h2 class="section-h">New call</h2>
       <div class="err" id="ad-err" role="alert"></div>
-      <div class="field"><label for="ad-q">Question</label><textarea id="ad-q" maxlength="140" placeholder="Will our pitch be under 3 minutes?"></textarea></div>
+      <div class="field"><label for="ad-q">Question</label><textarea id="ad-q" maxlength="140" placeholder="Will our pitch be under 3 minutes?"></textarea>
+        <div class="hint">Ideas (tap to use, then edit if you like):</div>
+        <div class="opts" style="flex-direction:column;margin-top:6px">${IDEAS.map((q, i) => `<button class="opt" style="text-align:left;font-weight:500" data-act="idea" data-i="${i}">${esc(q)}</button>`).join('')}</div></div>
       <div class="field"><label for="ad-close">Closes (UK time)</label>
         <div class="opts" style="margin-bottom:8px">
           <button class="opt" data-act="preset" data-k="hour">In 1 hour</button>
@@ -107,7 +118,7 @@ function listsHtml() {
         <div class="vote"><button class="yes" data-act="publish" data-id="${s.id}">Publish</button><button class="no" data-act="reject" data-id="${s.id}">Reject</button></div>
       </article>`).join('') : '<div class="empty">No suggestions waiting.</div>'}
     <h2 class="section-h">People (${people.length})</h2>
-    ${people.length ? people.map((p, i) => `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(p.name)}<br><span class="email">${esc(p.email || '')}</span></span><span class="sc">${p.score}</span></div>`).join('') : '<div class="empty">Nobody has joined yet.</div>'}`;
+    ${people.length ? people.map((p, i) => `<div class="row"><span class="rank">${i + 1}</span><span class="who">${esc(p.name)}<br><span class="email">${esc(p.email || '')}</span></span><span class="sc">${p.score}</span><button class="report" data-act="remove-person" data-id="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></div>`).join('') : '<div class="empty">Nobody has joined yet.</div>'}`;
 }
 
 function closeTime() {
@@ -181,6 +192,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'forget-key': setAdminKey(''); A.data = null; renderAdmin(root); break;
+    case 'idea': root.querySelector('#ad-q').value = IDEAS[Number(b.dataset.i)]; root.querySelector('#ad-q').focus(); break;
     case 'preset': root.querySelector('#ad-close').value = toLocalInput(preset(b.dataset.k)); break;
     case 'post': post(b); break;
     case 'publish': post(b, id); break;
@@ -212,6 +224,18 @@ document.addEventListener('click', e => {
     case 'remove':
       if (confirm(`Remove "${find()?.q}"? It disappears for everyone and its points no longer count.`)) update(b, id, 'remove', {}, 'Call removed');
       break;
+    case 'remove-person': {
+      const p = A.data?.people.find(x => x.id === id);
+      if (p && confirm(`Remove ${p.name} (${p.email})? Their account and calls are deleted for good.`)) {
+        b.disabled = true;
+        api.admin.removePerson(id).then(({ data, error }) => {
+          if (error) { b.disabled = false; return toast(error); }
+          A.data = data; root.querySelector('#admin-lists').innerHTML = listsHtml();
+          toast(`${p.name} removed`);
+        });
+      }
+      break;
+    }
     case 'qr': showQr(); break;
     case 'qr-close': closeQr(); break;
   }

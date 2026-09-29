@@ -171,7 +171,8 @@ async function join(st, body) {
   return json(200, { token, returning: !!existing, state: publicState(await loadWorld(st), user) });
 }
 
-async function deleteMe(st, me) {
+// Used by "Delete my account" and by the admin's "Remove" on the People list.
+async function deleteUser(st, me) {
   const mine = (await keys(st, 'fx/')).filter(k => k.split('/')[2] === me.id);
   const suggestions = await Promise.all((await keys(st, 'suggestion/')).map(k => st.get(k, { type: 'json' })));
   const toDelete = [
@@ -184,7 +185,6 @@ async function deleteMe(st, me) {
   ];
   await Promise.all(toDelete.map(k => st.delete(k)));
   forget();
-  return json(200, { ok: true });
 }
 
 // ---------- Calls ----------
@@ -299,6 +299,12 @@ export default async (req) => {
       if (route === 'GET admin') return adminState(st);
       if (route === 'POST admin/calls' && !parts[2]) return createCall(st, body);
       if (route === 'POST admin/calls' && parts[2]) return updateCall(st, parts[2], body);
+      if (route === 'POST admin/people' && parts[2]) {
+        const user = await st.get(`user/${parts[2]}`, { type: 'json' });
+        if (!user) return fail(404, 'That person has already been removed.');
+        await deleteUser(st, user);
+        return adminState(st);
+      }
       if (route === 'POST admin/suggestions' && parts[2]) {
         await st.delete(`suggestion/${parts[2]}`);
         return adminState(st);
@@ -313,7 +319,7 @@ export default async (req) => {
     if (!me) return fail(401, 'Please join first.');
     if (route === 'POST forecast') return forecast(st, me, body);
     if (route === 'POST suggest') return suggest(st, me, body);
-    if (route === 'POST delete-me') return deleteMe(st, me);
+    if (route === 'POST delete-me') { await deleteUser(st, me); return json(200, { ok: true }); }
     return fail(404, 'Not found.');
   } catch (err) {
     console.error(err);
