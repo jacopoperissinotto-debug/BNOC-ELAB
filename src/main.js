@@ -17,7 +17,7 @@ const S = {
   state: null,        // what the server says: me, calls, board, score, rank, people
   loaded: false,
   tab: 'calls',
-  filter: 'live',     // 'live' | 'mine' | 'settled'
+  filter: 'live',     // 'live' | 'mine' | 'results'
   callCtx: null,      // the call being answered in the confidence sheet
   commentsFor: null   // the call whose comments are open
 };
@@ -124,17 +124,25 @@ function callCard(c) {
 
 function renderCalls() {
   const all = S.state.calls;
-  const shown = S.filter === 'live' ? all.filter(c => c.status !== 'settled')
-    : S.filter === 'mine' ? all.filter(c => c.mine)
-    : all.filter(c => c.status === 'settled');
-  const f = (k, l) => `<button data-act="filter" data-f="${k}" aria-pressed="${S.filter === k}">${l}</button>`;
-  const empty = S.filter === 'live' ? 'No live calls right now. New ones are on the way.'
-    : S.filter === 'mine' ? "You haven't made any calls yet. Tap Yes or No on a live call."
-    : 'Nothing settled yet. Results land here once a call closes.';
+  // Live = still open and you haven't called it yet (your to-do list); Yours = everything you've called;
+  // Results = calls that have closed, whether waiting for a result or settled.
+  const groups = {
+    live: all.filter(c => c.status === 'open' && !c.mine),
+    mine: all.filter(c => c.mine),
+    results: all.filter(c => c.status !== 'open')
+  };
+  const shown = groups[S.filter] || groups.live;
+  const f = (k, l, n) => `<button data-act="filter" data-f="${k}" aria-pressed="${S.filter === k}">${l}${n ? ` <span class="seg-count">${n}</span>` : ''}</button>`;
+  const allCalled = S.filter === 'live' && !shown.length && groups.mine.some(c => c.status === 'open');
+  const empty = allCalled
+    ? `You've made every live call. <button class="link-btn" data-act="filter" data-f="mine">See yours</button>`
+    : S.filter === 'live' ? 'No live calls right now. New ones are on the way.'
+    : S.filter === 'mine' ? "You haven't made any calls yet. Tap an answer on a live call."
+    : 'No results yet. Calls land here once they close.';
   return `<h1 class="page-title">Calls</h1>
     <p class="page-sub">What's going to happen at ${esc(COMMUNITY.name)}? Make your call before it closes.</p>
     <div class="host">${KE_AVATAR}<span><b>Official community · ${S.state.people} ${S.state.people === 1 ? 'person' : 'people'}.</b> Calls are posted by the E-Lab team. Tap + to suggest one.</span></div>
-    <div class="seg" role="group" aria-label="Filter calls">${f('live', 'Live')}${f('mine', 'Yours')}${f('settled', 'Settled')}</div>
+    <div class="seg" role="group" aria-label="Filter calls">${f('live', 'Live', groups.live.length)}${f('mine', 'Yours')}${f('results', 'Results')}</div>
     ${shown.length ? shown.map(callCard).join('') : `<div class="empty">${empty}</div>`}`;
 }
 
