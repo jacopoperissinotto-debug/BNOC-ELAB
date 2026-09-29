@@ -239,11 +239,21 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 /* ---------- BNOC app additions (not in the demo) ---------- */
 [hidden]{display:none!important}
 .onboard .err{margin:-6px 0 14px}
-.onboard .lead{color:#CFC2DE;font-size:15px;line-height:1.5;margin:0 0 20px}
-.onboard .lead b{color:#fff}
-.onboard .secondary{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.35)}
-.onboard .small a{color:#fff}
-.onboard input.code-input{font-family:var(--display);font-weight:800;font-size:28px;letter-spacing:6px;text-align:center}
-.primary[disabled]{opacity:.6;cursor:default}
-.me-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px 16px;margin-bottom:12px;font-size:14px;line-height:1.5}
-.me-card .muted{color:var(--muted)}
+.onboard .linkish{background:none;border:0;padding:0;color:#fff;text-decoration:underline;font-size:inherit}
+.primary[disabled],.secondary[disabled],.settle-btn[disabled],.vote button[disabled]{opacity:.6;cursor:default}
+.secondary.danger{color:var(--coral-dark)}
+.privacy-text p{font-size:14px;line-height:1.5;margin:0 0 10px}
+.field input[type=password],.field input[type=datetime-local],.field input[type=email]{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:12px;background:var(--bg);font-size:16px}
+.field input:focus{border-color:var(--plum);outline:none;background:#fff}
+.row .email{font-size:12px;color:var(--muted);font-weight:400}
+.page-sub a{color:var(--coral-dark);font-weight:700}
+
+/* Full-screen join QR code for the projector */
+.qr-overlay{position:fixed;inset:0;z-index:100;background:var(--plum);display:grid;place-items:center;padding:24px}
+.qr-card{background:#fff;border-radius:32px;padding:clamp(20px,4vh,40px);text-align:center;display:flex;flex-direction:column;align-items:center}
+.qr-card .mark{font-family:var(--display);font-weight:800;font-size:clamp(40px,7vh,72px);letter-spacing:-2px;margin:0 0 8px;color:var(--plum);line-height:1}
+.qr-card .mark span{color:var(--coral)}
+.qr-img svg{width:min(58vh,78vw);height:auto;display:block}
+.qr-url{font-family:var(--display);font-weight:800;font-size:clamp(22px,4vh,40px);color:var(--plum);margin:10px 0 0}
+.qr-sub{color:var(--muted);margin:4px 0 0;font-size:clamp(14px,2.2vh,20px)}
+.qr-close{position:fixed;top:16px;right:16px;border:0;border-radius:999px;padding:10px 16px;font-weight:700;background:rgba(255,255,255,.15);color:#fff}

@@ -6,11 +6,14 @@
 [build.environment]
   NODE_VERSION = "22"
 
-# The app is a single page; send every path to it.
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+[functions]
+  # Bundles the back end (netlify/functions/api.mjs) together with shared/rules.js.
+  node_bundler = "esbuild"
+
+[dev]
+  command = "npx vite"
+  targetPort = 5173
+  port = 8888
 
 [[headers]]
   for = "/*"

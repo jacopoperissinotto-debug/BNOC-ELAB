@@ -1,31 +1,56 @@
 # BNOC · Big Name On Campus
 
-A free-to-play social forecasting app for the King's E-Lab pilot. People make yes/no calls about real life in their community, earn points for being right, and get a bonus for showing up to events. There's no money anywhere.
+A free-to-play forecasting app for the King's E-Lab pilot. People make yes/no calls about real life in their community, say how sure they are, and earn points for being right. There's no money anywhere: nothing to buy, stake or cash out.
 
 - **Design reference:** `bnoc-demo/index.html` (the original prototype, never modified)
-- **Front end:** plain HTML/CSS/JS, built with Vite, talking to Supabase with `supabase-js`
-- **Back end:** Supabase (login + Postgres). Every table has Row Level Security; scoring happens in the database
+- **Front end:** plain HTML/CSS/JS built with Vite (`index.html`, `src/`)
+- **Back end:** one Netlify Function (`netlify/functions/api.mjs`) storing data in Netlify Blobs, Netlify's built-in storage. No other services or accounts needed.
+- **Shared rules:** `shared/rules.js` (confidence scoring, @cam.ac.uk check, banned topics), used by both the app and the back end
 - **Hosting:** Netlify, deploying automatically from GitHub
+
+> A fuller Supabase version (magic-link login, database rules, private groups) was started and is parked on the `supabase-version` git branch.
+
+## How the pilot works
+
+| Who | What they do |
+|---|---|
+| Everyone | Open bnoc.netlify.app (or scan the QR), type first name and @cam.ac.uk email, make calls |
+| Admin | Opens **bnoc.netlify.app/#/admin**, types the admin key, posts calls with a closing time, closes and settles them |
+
+Scoring (worked out by the back end, never the browser):
+
+| Confidence | Right | Wrong |
+|---|---|---|
+| Hunch (60%) | +10 | 0 |
+| Fairly sure (75%) | +20 | −5 |
+| Certain (90%) | +30 | −15 |
+
+Rules the back end enforces: answers are locked once made; no answers after a call closes; a call can only be settled after it closes; only the admin key can post, close, settle or remove calls; suggestions about banned topics (relationships, health, appearance, grades) are refused.
+
+**Pilot shortcut:** there is no email verification. Typing the same email again logs you back into the same account. Fine for a small pilot, not for a public launch.
+
+## Deploy (Netlify + GitHub)
+
+1. Push this repository to GitHub.
+2. In Netlify: **Project configuration → Build & deploy → Continuous deployment → Link repository**, choose the repo, branch `main`. Build settings come from `netlify.toml`.
+3. In Netlify: **Environment variables → Add a variable**: key `ADMIN_KEY`, value a long passphrase only admins know. Redeploy after adding it.
+4. Every push to `main` now deploys automatically.
+
+## Make someone an admin
+
+Admins don't have special accounts: anyone who knows `ADMIN_KEY` can open `/#/admin`. To add an admin, share the passphrase with them privately. To remove admins, change `ADMIN_KEY` in Netlify and redeploy.
 
 ## Run it on your computer
 
 1. Install Node.js (LTS) from https://nodejs.org
-2. In this folder, copy `.env.example` to `.env` and fill in your Supabase project URL and **public** (anon / publishable) key
-3. Install and start:
+2. Copy `.env.example` to `.env` and set `ADMIN_KEY`
+3. In this folder:
    ```bash
    npm install
-   npm run dev
+   npx netlify-cli dev
    ```
-4. Open http://localhost:5173
+4. Open http://localhost:8888 (the app) and http://localhost:8888/#/admin (admin). Local data is kept separately from the live site.
 
-## Database
+## Privacy
 
-All database setup lives in `supabase/migrations/` as SQL files, applied in order. Login email templates are in `supabase/templates/`.
-
-_More detail (applying migrations, deploying, making someone an admin) is added as each phase is built._
-
-## Security notes
-
-- Only the public anon/publishable key is used in the front end. **Never** put the secret / service_role key in this project.
-- `.env` is ignored by git.
-- Only `@cam.ac.uk` emails can create accounts. The app checks it for a friendly message, and a database trigger enforces it.
+The in-app privacy notice (Me → Privacy notice) explains what's collected. **Delete my account** (Me tab) removes the person's name, email, login sessions, calls and suggestions straight away.

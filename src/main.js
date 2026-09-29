@@ -1,232 +1,344 @@
-// App start-up: decide whether to show the join/login screens or the app itself,
-// and switch between tabs. Screens for calls, groups and ranks arrive in later phases.
+// BNOC pitch app: join, make calls, see the leaderboard. The admin page lives in admin.js (#/admin).
 import './styles.css';
-import { supabase } from './supabase.js';
-import { joinBnoc, sendLoginEmail, verifyCode, signOut, linkErrorFromUrl, isCamEmail, CAM_ONLY_MSG } from './auth.js';
-import { $, esc, toast, closeSheet, openSheet, showError, avatar } from './ui.js';
+import { api, getToken, setToken } from './api.js';
+import { $, esc, ord, toast, openSheet, closeSheet, showError, clearError, avatar, sideLabel, fmtWhen } from './ui.js';
+import { CONF, COMMUNITY, isCamEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../shared/rules.js';
+import { renderAdmin, refreshAdmin } from './admin.js';
 
-const TABS = ['calls', 'groups', 'ranks', 'me'];
+const TABS = ['calls', 'ranks', 'how', 'me', 'admin'];
+const REFRESH_MS = 15000;
 
 const S = {
-  session: null,
-  profile: null,
-  email: null,          // this account's @cam.ac.uk address (private to them)
-  gate: 'join',         // which logged-out screen: 'join' | 'email' | 'code'
-  gateError: null,
-  draftName: '',
-  draftEmail: '',
-  joining: false,
-  tab: 'calls'
+  state: null,        // what the server says: me, calls, board, score, rank, people
+  loaded: false,
+  tab: 'calls',
+  filter: 'live',     // 'live' | 'mine' | 'settled'
+  callCtx: null       // the call being answered in the confidence sheet
 };
 
-const isAnon = () => !!S.session?.user?.is_anonymous;
+const me = () => S.state?.me;
 
-// ---------- Gate: join, admin email login, first-time name ----------
-const MARK = '<p class="mark">BN<span>O</span>C</p><p class="full">Big Name On Campus</p>';
-const errBox = () => `<div class="err ${S.gateError ? 'show' : ''}" id="gate-err" role="alert">${esc(S.gateError || '')}</div>`;
-
+// ---------- Join ----------
 function renderGate() {
-  const g = $('#gate');
-  g.classList.remove('hide');
+  $('#gate').classList.remove('hide');
   $('#top').hidden = true; $('#content').hidden = true; $('#nav').hidden = true;
-
-  // Join: everyone at the pitch. Also the "what's your name" step after a first admin email login.
-  if (S.session || S.gate === 'join') {
-    const needEmail = !S.session || isAnon();
-    g.innerHTML = `${MARK}
-      <p class="pitch">Call what happens around you. Show up. Top the table.</p>
-      <label for="ob-name">Your first name</label>
-      <input id="ob-name" type="text" maxlength="30" placeholder="e.g. Araha" autocomplete="given-name" value="${esc(S.draftName)}">
-      ${needEmail ? `<label for="ob-email">Your Cambridge email</label>
-      <input id="ob-email" type="email" inputmode="email" autocomplete="email" placeholder="crsid@cam.ac.uk" value="${esc(S.draftEmail)}">` : ''}
-      ${errBox()}
-      <div class="spacer"></div>
-      <button class="primary" data-act="join">Join BNOC</button>
-      ${S.session ? '' : '<button class="secondary" data-act="gate" data-to="email">Admin? Log in with an email code</button>'}
-      <p class="small">Only @cam.ac.uk addresses. This phone remembers you: no password, no email to check. 18+ only. Free to play: no money, nothing to buy, nothing to cash out.</p>`;
-    setTimeout(() => $('#ob-name')?.focus(), 50);
+  if (!S.loaded) {
+    $('#gate').innerHTML = '<p class="mark">BN<span>O</span>C</p><p class="full">Loading…</p>';
     return;
   }
-
-  if (S.gate === 'code') {
-    g.innerHTML = `${MARK}
-      <p class="pitch">Check your email</p>
-      <p class="lead">We sent a login link and a code to <b>${esc(S.draftEmail)}</b>. Tap the link, or type the code here.</p>
-      <label for="login-code">Code from the email</label>
-      <input id="login-code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="••••••">
-      ${errBox()}
-      <div class="spacer"></div>
-      <button class="primary" data-act="verify-code">Log in</button>
-      <button class="secondary" data-act="gate" data-to="email">Use a different email</button>
-      <p class="small">Nothing yet? It can take a minute. Check junk or quarantine, then send a new one.</p>`;
-    setTimeout(() => $('#login-code')?.focus(), 50);
-    return;
-  }
-
-  g.innerHTML = `${MARK}
-    <p class="pitch">Admin login</p>
-    <p class="lead">We'll email you a login link and a code, so you can use your admin account on any device.</p>
-    <label for="login-email">Your Cambridge email</label>
-    <input id="login-email" type="email" inputmode="email" autocomplete="email" placeholder="crsid@cam.ac.uk" value="${esc(S.draftEmail)}">
-    ${errBox()}
+  $('#gate').innerHTML = `<p class="mark">BN<span>O</span>C</p>
+    <p class="full">Big Name On Campus · ${esc(COMMUNITY.name)}</p>
+    <p class="pitch">Call what happens around you. Show up. Top the table.</p>
+    <label for="ob-name">Your first name</label>
+    <input id="ob-name" type="text" maxlength="30" placeholder="e.g. Araha" autocomplete="given-name">
+    <label for="ob-email">Your Cambridge email</label>
+    <input id="ob-email" type="email" inputmode="email" autocomplete="email" placeholder="crsid@cam.ac.uk">
+    <div class="err" id="gate-err" role="alert"></div>
     <div class="spacer"></div>
-    <button class="primary" data-act="send-link">Email me a login code</button>
-    <button class="secondary" data-act="gate" data-to="join">Back to Join</button>`;
-  setTimeout(() => $('#login-email')?.focus(), 50);
-}
-
-function gateError(msg) {
-  S.gateError = msg;
-  showError($('#gate-err'), msg);
+    <button class="primary" data-act="join">Join BNOC</button>
+    <p class="small">Only @cam.ac.uk addresses. 18+ only. Free to play: no money, nothing to buy, nothing to cash out.
+      <button class="linkish" data-act="privacy">Privacy</button></p>`;
 }
 
 async function onJoin(btn) {
-  S.draftName = $('#ob-name').value.trim();
-  const emailEl = $('#ob-email');
-  if (emailEl) S.draftEmail = emailEl.value.trim();
-  if (!S.draftName) return gateError('Add your first name so people know who made a call.');
-  if (emailEl && !isCamEmail(S.draftEmail)) return gateError(CAM_ONLY_MSG);
-
+  const name = $('#ob-name').value.trim(), email = $('#ob-email').value.trim(), err = $('#gate-err');
+  clearError(err);
+  if (!name) return showError(err, 'Add your first name so people know who made a call.');
+  if (!isCamEmail(email)) return showError(err, CAM_ONLY_MSG);
   btn.disabled = true; btn.textContent = 'Joining…';
-  S.joining = true;
-  const { error } = await joinBnoc(S.draftName, emailEl ? S.draftEmail : null);
-  S.joining = false;
-  S.gateError = error;
-  const { data: { session } } = await supabase.auth.getSession();
-  await onSession(session);
-  if (!error) toast(`Welcome, ${S.profile?.display_name}`);
+  const { data, error } = await api.join(name, email);
+  btn.disabled = false; btn.textContent = 'Join BNOC';
+  if (error) return showError(err, error);
+  setToken(data.token);
+  S.state = data.state;
+  S.tab = 'calls'; S.filter = 'live';
+  if (location.hash !== '#/calls') location.hash = '#/calls';
+  render();
+  toast(data.returning ? `Welcome back, ${data.state.me.name}` : `Welcome, ${data.state.me.name}. Make your first call!`);
 }
 
-async function onSendLink(btn) {
-  S.draftEmail = $('#login-email').value.trim();
-  if (!isCamEmail(S.draftEmail)) return gateError(CAM_ONLY_MSG);
-  btn.disabled = true; btn.textContent = 'Sending…';
-  const { error } = await sendLoginEmail(S.draftEmail);
-  btn.disabled = false; btn.textContent = 'Email me a login code';
-  if (error) return gateError(error);
-  S.gate = 'code'; S.gateError = null;
-  renderGate();
-}
-
-async function onVerifyCode(btn) {
-  btn.disabled = true; btn.textContent = 'Checking…';
-  const { error } = await verifyCode(S.draftEmail, $('#login-code').value);
-  btn.disabled = false; btn.textContent = 'Log in';
-  if (error) gateError(error);
-  // On success, onAuthStateChange below takes over.
-}
-
-// ---------- The app ----------
-function tabFromHash() {
-  const t = window.location.hash.replace(/^#\//, '');
-  return TABS.includes(t) ? t : 'calls';
-}
-
+// ---------- Layout ----------
 function render() {
-  if (!S.session || !S.profile?.display_name) return renderGate();
+  if (S.tab === 'admin') return renderAdminPage();
+  if (!me()) return renderGate();
   $('#gate').classList.add('hide');
   $('#top').hidden = false; $('#content').hidden = false; $('#nav').hidden = false;
+  $('#pts').textContent = S.state.score;
   document.querySelectorAll('#nav [data-tab]').forEach(b => {
     if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
   });
-  $('#content').innerHTML = ({ calls: renderCalls, groups: renderSoon, ranks: renderSoon, me: renderMe })[S.tab]();
+  $('#content').innerHTML = ({ calls: renderCalls, ranks: renderRanks, how: renderHow, me: renderMe })[S.tab]();
+}
+
+function renderAdminPage() {
+  $('#gate').classList.add('hide');
+  $('#top').hidden = true; $('#nav').hidden = true; $('#content').hidden = false;
+  renderAdmin($('#content'));
+}
+
+// ---------- Calls ----------
+const KE_AVATAR = `<span class="avatar" style="background:var(--plum)" aria-hidden="true">${COMMUNITY.short}</span>`;
+
+function callCard(c) {
+  const total = c.yes + c.no, p = total ? Math.round(c.yes / total * 100) : 50;
+  let chips = '';
+  if (c.status === 'closed') chips += '<span class="chip wait">Closed · result coming soon</span>';
+  if (c.status === 'settled') {
+    chips += `<span class="chip">Result: ${sideLabel(c.result)}</span>`;
+    if (c.mine) {
+      chips += c.mine.pts > 0
+        ? `<span class="chip won">You called it: +${c.mine.pts}</span>`
+        : `<span class="chip lost">Missed: ${c.mine.pts === 0 ? 'no points' : '−' + (-c.mine.pts)}</span>`;
+    }
+  }
+  let action = '';
+  if (c.status === 'open' && !c.mine) {
+    action = `<div class="vote"><button class="yes" data-act="call" data-id="${c.id}" data-side="yes">Yes</button><button class="no" data-act="call" data-id="${c.id}" data-side="no">No</button></div>`;
+  } else if (c.mine && c.status !== 'settled') {
+    const cf = CONF[c.mine.conf];
+    action = `<div class="my-stake"><span>You called <span class="side-tag ${c.mine.side === 'yes' ? 'y' : 'n'}">${sideLabel(c.mine.side)}</span> · ${cf.label}</span><span>+${cf.win} if right</span></div>`;
+  }
+  const when = c.status === 'open' ? `Closes ${fmtWhen(c.closesAt)}` : c.status === 'closed' ? `Closed ${fmtWhen(c.closesAt)}` : 'Settled';
+  return `<article class="call">
+    <div class="call-meta">${KE_AVATAR}<span><b>${esc(COMMUNITY.name)}</b> · official call</span></div>
+    <h3>${esc(c.q)}</h3>
+    ${chips ? `<div class="chips">${chips}</div>` : ''}
+    <div class="bar" role="img" aria-label="The crowd says ${p}% Yes"><div class="y" style="width:${Math.max(p, 14)}%">Yes ${p}%</div><div class="n">No ${100 - p}%</div></div>
+    <div class="call-foot"><span>${total} ${total === 1 ? 'person' : 'people'} called it · ${when}</span></div>
+    ${action}
+  </article>`;
 }
 
 function renderCalls() {
-  return `<h1 class="page-title">Hi, ${esc(S.profile.display_name)}</h1>
-    <p class="page-sub">You're in. Calls for King's E-Lab arrive in the next phase.</p>
-    <div class="empty">Nothing here yet.</div>`;
+  const all = S.state.calls;
+  const shown = S.filter === 'live' ? all.filter(c => c.status !== 'settled')
+    : S.filter === 'mine' ? all.filter(c => c.mine)
+    : all.filter(c => c.status === 'settled');
+  const f = (k, l) => `<button data-act="filter" data-f="${k}" aria-pressed="${S.filter === k}">${l}</button>`;
+  const empty = S.filter === 'live' ? 'No live calls right now. New ones are on the way.'
+    : S.filter === 'mine' ? "You haven't made any calls yet. Tap Yes or No on a live call."
+    : 'Nothing settled yet. Results land here once a call closes.';
+  return `<h1 class="page-title">Calls</h1>
+    <p class="page-sub">What's going to happen at ${esc(COMMUNITY.name)}? Make your call before it closes.</p>
+    <div class="host">${KE_AVATAR}<span><b>Official community · ${S.state.people} ${S.state.people === 1 ? 'person' : 'people'}.</b> Calls are posted by the E-Lab team. Tap + to suggest one.</span></div>
+    <div class="seg" role="group" aria-label="Filter calls">${f('live', 'Live')}${f('mine', 'Yours')}${f('settled', 'Settled')}</div>
+    ${shown.length ? shown.map(callCard).join('') : `<div class="empty">${empty}</div>`}`;
 }
 
-function renderSoon() {
-  const title = S.tab[0].toUpperCase() + S.tab.slice(1);
-  return `<h1 class="page-title">${title}</h1><div class="empty">Coming in a later phase.</div>`;
+function openCall(id, side) {
+  const c = S.state.calls.find(x => x.id === id);
+  if (!c) return;
+  S.callCtx = { id, side, conf: 'sure' };
+  openSheet(`<h2 id="sheet-title">${esc(c.q)}</h2>
+    <p class="lead">You're calling <span class="side-tag ${side === 'yes' ? 'y' : 'n'}">${sideLabel(side)}</span>. How sure are you?</p>
+    <div class="conf" role="group" aria-label="Confidence">${Object.entries(CONF).map(([k, v]) => `<button data-act="conf" data-k="${k}" aria-pressed="${k === 'sure'}"><b>${v.label}</b><span>${v.pct}</span></button>`).join('')}</div>
+    <div class="est" id="call-est"></div>
+    <div class="err" id="call-err" role="alert"></div>
+    <button class="primary" data-act="confirm-call">Call ${sideLabel(side)}</button>
+    <button class="secondary" data-act="close">Cancel</button>
+    <p class="lead center" style="font-size:12.5px;margin:12px 0 0">Calls are locked once made.</p>`);
+  updateEst();
 }
 
+function updateEst() {
+  const cf = CONF[S.callCtx.conf];
+  $('#call-est').innerHTML = `Right: <b>+${cf.win}</b>. Wrong: <b>${cf.lose ? '−' + cf.lose : 'no change'}</b>. You aren't spending anything.`;
+}
+
+async function confirmCall(btn) {
+  const { id, side, conf } = S.callCtx;
+  btn.disabled = true;
+  const { data, error } = await api.forecast(id, side, conf);
+  btn.disabled = false;
+  if (error) {
+    showError($('#call-err'), error);
+    refresh();
+    return;
+  }
+  S.state = data.state;
+  closeSheet(); render();
+  toast(`Called ${sideLabel(side)}, ${CONF[conf].label.toLowerCase()}`);
+}
+
+// ---------- Suggest a call ----------
+function openSuggest() {
+  openSheet(`<h2 id="sheet-title">Suggest a call</h2>
+    <p class="lead">Suggest a yes/no question for everyone in ${esc(COMMUNITY.name)}. The E-Lab team checks suggestions before they go live.</p>
+    <div class="err" id="sg-err" role="alert"></div>
+    <div class="field"><label for="sg-q">Your question</label><textarea id="sg-q" maxlength="140" placeholder="Will more than 40 people come to Thursday's social?"></textarea>
+      <div class="hint">Not allowed: relationships, health, appearance or grades.</div></div>
+    <button class="primary" data-act="send-suggestion">Send suggestion</button>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+
+async function sendSuggestion(btn) {
+  const q = $('#sg-q').value.trim(), err = $('#sg-err');
+  clearError(err);
+  if (q.length < 10) return showError(err, 'Write a full question, like "Will the E-Lab social run past 10pm?"');
+  if (isBannedTopic(q)) return showError(err, BANNED_MSG);
+  btn.disabled = true;
+  const { error } = await api.suggest(q);
+  btn.disabled = false;
+  if (error) return showError(err, error);
+  closeSheet();
+  toast('Suggestion sent. The E-Lab team reviews it before it goes live.');
+}
+
+// ---------- Ranks ----------
+function renderRanks() {
+  const b = S.state.board, myId = me().id;
+  const label = x => x.id === myId ? 'You' : x.name;
+  const pod = (x, place, cls) => x ? `<div class="pod ${cls}">${avatar(x.id, x.name)}<div class="n">${esc(label(x))}</div><div class="s">${x.score}</div><div class="place">${ord(place)}</div></div>` : '<div></div>';
+  return `<h1 class="page-title">Ranks</h1>
+    <p class="page-sub">Season 1 in ${esc(COMMUNITY.name)}. Points land when a call is settled.</p>
+    <div class="banner"><span aria-hidden="true">★</span><span><b>You're ${ord(S.state.rank)} of ${S.state.people}.</b> Honest confidence scores best over a season.</span></div>
+    <div class="podium">${pod(b[1], 2, '')}${pod(b[0], 1, 'first')}${pod(b[2], 3, '')}</div>
+    ${b.slice(3).map((x, i) => `<div class="row ${x.id === myId ? 'me' : ''}"><span class="rank">${i + 4}</span>${avatar(x.id, x.name)}<span class="who">${esc(x.id === myId ? `${x.name} (you)` : x.name)}</span><span class="sc">${x.score}</span></div>`).join('')}`;
+}
+
+// ---------- Rules ----------
+function scoringTable() {
+  return `<table class="score-table"><thead><tr><th>Confidence</th><th>Right</th><th>Wrong</th></tr></thead><tbody>
+    ${Object.values(CONF).map(c => `<tr><td>${c.label} (${c.pct})</td><td class="plus">+${c.win}</td><td class="minus">${c.lose ? '−' + c.lose : '0'}</td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+function renderHow() {
+  return `<h1 class="page-title">How it works</h1>
+    <p class="page-sub">Forecasting, not betting. There's no money anywhere.</p>
+    <div class="rules"><b>1. Make a call.</b> Pick Yes or No on a question about ${esc(COMMUNITY.name)}, and say how sure you are:
+      ${scoringTable()}
+      <b>2. Wait for the result.</b> Calls lock at their closing time, then the E-Lab team settles them.<br>
+      <b>3. Climb the table.</b> You never put points in, so you can't lose anything you own. Honest confidence scores best over a season.<br><br>
+      Points can't be bought, sold or cashed out.</div>
+    <div class="rules"><b>House rules.</b> No calls about relationships, health, appearance or grades. Tap + to suggest a call; the E-Lab team checks every suggestion.</div>
+    <button class="secondary" data-act="privacy">Privacy notice</button>`;
+}
+
+// ---------- Me ----------
 function renderMe() {
-  const p = S.profile;
+  const m = me(), s = S.state;
+  const log = s.calls.filter(c => c.mine).map(c => {
+    const short = c.q.length > 46 ? c.q.slice(0, 44) + '…' : c.q;
+    if (c.status === 'settled') {
+      const p = c.mine.pts;
+      return `<li><span>${p > 0 ? 'Right' : 'Wrong'}: ${esc(short)}</span><span class="${p >= 0 ? 'plus' : 'minus'}">${p > 0 ? '+' + p : p < 0 ? '−' + (-p) : '0'}</span></li>`;
+    }
+    return `<li><span>Called ${sideLabel(c.mine.side)} (${CONF[c.mine.conf].label.toLowerCase()}): ${esc(short)}</span><span>·</span></li>`;
+  });
   return `<h1 class="page-title">Me</h1>
-    <div class="me-card">${avatar(p.id, p.display_name)}
-      <p style="margin:10px 0 0"><b>${esc(p.display_name)}</b>${p.is_admin ? ' · admin' : ''}<br>
-      <span class="muted">${esc(S.email || '')}</span></p>
-      ${isAnon() ? '<p class="muted" style="margin:8px 0 0">Your account lives on this device.</p>' : ''}</div>
-    <button class="secondary" data-act="sign-out">Log out</button>`;
+    <div class="balance"><div class="big">${s.score}</div><div class="lbl">season score · ${ord(s.rank)} of ${s.people} in ${esc(COMMUNITY.name)}</div>
+      <div class="fine">Signed in as ${esc(m.name)} · ${esc(m.email)}</div></div>
+    <h2 class="section-h">Activity</h2>
+    ${log.length ? `<ul class="log">${log.join('')}</ul>` : '<div class="empty">No calls yet. Your results will show up here.</div>'}
+    <h2 class="section-h">Account</h2>
+    <button class="secondary" data-act="privacy">Privacy notice</button>
+    <button class="secondary" data-act="sign-out">Log out</button>
+    <button class="secondary danger" data-act="delete-me">Delete my account</button>`;
+}
+
+function openPrivacy() {
+  openSheet(`<h2 id="sheet-title">Privacy notice</h2>
+    <div class="privacy-text">
+      <p><b>What we collect.</b> Your first name, your Cambridge email address, and the calls you make (Yes/No, how sure you were, and when).</p>
+      <p><b>Why.</b> Only to run BNOC: to work out results and scores, and to show the leaderboard. No ads, and we never sell your data.</p>
+      <p><b>Who can see it.</b> Other members see your first name and score. They see how many people said Yes or No on each call, but never your individual calls or your email. The small E-Lab team running the pilot can see names, emails and scores, to run the game and contact winners.</p>
+      <p><b>Where it's kept.</b> On Netlify, the service that hosts BNOC.</p>
+      <p><b>Deleting your account.</b> Go to Me, then Delete my account. Your name, email and calls are removed straight away.</p>
+      <p><b>Pilot note.</b> During the pilot we don't verify email addresses, so please only use your own.</p>
+    </div>
+    <button class="primary" data-act="close">Got it</button>`);
 }
 
 function confirmSignOut() {
-  if (!isAnon()) return signOut();
-  openSheet(`<h2 id="sheet-title">Log out for good?</h2>
-    <p class="lead">Your account lives on this device. If you log out, you can't get back into it, and your points stay with the old account.</p>
+  openSheet(`<h2 id="sheet-title">Log out?</h2>
+    <p class="lead">You can come back any time by joining with the same email. Your points stay with your account.</p>
     <button class="primary" data-act="sign-out-confirm">Log out</button>
     <button class="secondary" data-act="close">Stay logged in</button>`);
 }
 
-function openAbout() {
-  openSheet(`<h2 id="sheet-title">How BNOC works</h2>
-    <p class="lead">Make yes/no calls about what happens around King's E-Lab. Pick how sure you are, earn points for being right, and get a bonus for showing up to events. There's no money anywhere: nothing to buy, stake or cash out.</p>
-    <button class="primary" data-act="close">Got it</button>`);
+function confirmDelete() {
+  openSheet(`<h2 id="sheet-title">Delete your account?</h2>
+    <p class="lead">This removes your name, email and all your calls from BNOC straight away. You'll disappear from the leaderboard. This can't be undone.</p>
+    <div class="err" id="del-err" role="alert"></div>
+    <button class="primary" data-act="delete-confirm">Delete my account</button>
+    <button class="secondary" data-act="close">Keep my account</button>`);
 }
 
-// ---------- Session ----------
-async function loadProfile() {
-  const uid = S.session.user.id;
-  const [prof, mail] = await Promise.all([
-    supabase.from('profiles').select('id, display_name, is_admin').eq('id', uid).maybeSingle(),
-    supabase.from('account_emails').select('email').eq('user_id', uid).maybeSingle()
-  ]);
-  if (prof.error) toast("Couldn't load your profile. Try refreshing.");
-  S.profile = prof.data;
-  S.email = mail.data?.email || null;
+async function deleteAccount(btn) {
+  btn.disabled = true;
+  const { error } = await api.deleteMe();
+  btn.disabled = false;
+  if (error) return showError($('#del-err'), error);
+  setToken('');
+  S.state = { ...S.state, me: null };
+  closeSheet(); render();
+  toast('Your account has been deleted');
 }
 
-async function onSession(session) {
-  S.session = session;
-  S.profile = null;
-  if (session) await loadProfile();
-  else { S.gate = 'join'; S.email = null; }
+// ---------- Data ----------
+async function refresh() {
+  if (S.tab === 'admin') return refreshAdmin();
+  const { data, error } = await api.state();
+  S.loaded = true;
+  if (error) {
+    if (!S.state) { S.state = { me: null }; render(); }
+    return;
+  }
+  if (!data.me && getToken()) setToken('');   // this phone's login no longer exists
+  S.state = data;
+  // Don't redraw the join form under someone's fingers.
+  if (!me() && !$('#gate').classList.contains('hide') && $('#ob-name')) return;
   render();
 }
 
 // ---------- Events ----------
+function tabFromHash() {
+  const t = location.hash.replace(/^#\//, '');
+  return TABS.includes(t) ? t : 'calls';
+}
+
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
-  if (!b) return;
+  if (!b || b.closest('[data-admin]')) return;   // admin.js handles its own buttons
+  const id = b.dataset.id;
   switch (b.dataset.act) {
     case 'join': onJoin(b); break;
-    case 'gate': S.gate = b.dataset.to; S.gateError = null; renderGate(); break;
-    case 'send-link': onSendLink(b); break;
-    case 'verify-code': onVerifyCode(b); break;
-    case 'tab': closeSheet(); window.location.hash = `#/${b.dataset.tab}`; break;
-    case 'new-call': toast('Making calls arrives in the next phase'); break;
-    case 'switch-comm': toast("King's E-Lab is the only community for now"); break;
-    case 'about': openAbout(); break;
-    case 'close': closeSheet(); break;
+    case 'tab': closeSheet(); location.hash = `#/${b.dataset.tab}`; break;
+    case 'filter': S.filter = b.dataset.f; render(); break;
+    case 'call': openCall(id, b.dataset.side); break;
+    case 'conf':
+      S.callCtx.conf = b.dataset.k;
+      document.querySelectorAll('[data-act="conf"]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.k === S.callCtx.conf)));
+      updateEst();
+      break;
+    case 'confirm-call': confirmCall(b); break;
+    case 'suggest': openSuggest(); break;
+    case 'send-suggestion': sendSuggestion(b); break;
+    case 'switch-comm': toast(`${COMMUNITY.name} is the only community in the pilot`); break;
+    case 'privacy': openPrivacy(); break;
     case 'sign-out': confirmSignOut(); break;
-    case 'sign-out-confirm': closeSheet(); signOut(); break;
+    case 'sign-out-confirm': setToken(''); S.state = { ...S.state, me: null }; closeSheet(); render(); break;
+    case 'delete-me': confirmDelete(); break;
+    case 'delete-confirm': deleteAccount(b); break;
+    case 'close': closeSheet(); break;
   }
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && $('#sheet').classList.contains('open')) closeSheet();
-  if (e.key !== 'Enter') return;
-  const act = { 'ob-name': 'join', 'ob-email': 'join', 'login-email': 'send-link', 'login-code': 'verify-code' }[e.target.id];
-  if (act) $(`[data-act="${act}"]`)?.click();
+  if (e.key === 'Enter' && (e.target.id === 'ob-name' || e.target.id === 'ob-email')) $('[data-act="join"]')?.click();
 });
 window.addEventListener('hashchange', () => {
+  const was = S.tab;
   S.tab = tabFromHash();
-  if (S.session && S.profile?.display_name) { render(); $('#content').scrollTop = 0; }
+  render();
+  $('#content').scrollTop = 0;
+  if (was === 'admin' && S.tab !== 'admin') refresh();
 });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+setInterval(() => { if (document.visibilityState === 'visible' && !$('#sheet').classList.contains('open')) refresh(); }, REFRESH_MS);
 
 // ---------- Start ----------
 S.tab = tabFromHash();
-S.gateError = linkErrorFromUrl();
-if (S.gateError) S.gate = 'email';
-supabase.auth.onAuthStateChange((event, session) => {
-  // While joining, onJoin handles the result itself (avoids redrawing the form mid-way).
-  if (S.joining) { S.session = session; return; }
-  // Only redraw when someone logs in or out, not on routine token refreshes.
-  if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') {
-    if (event === 'SIGNED_IN' && session?.user?.id === S.session?.user?.id && S.profile) return;
-    // Supabase advises not to await other Supabase calls inside this callback.
-    setTimeout(() => onSession(session), 0);
-  }
-});
+render();
+refresh();

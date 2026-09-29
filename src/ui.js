@@ -45,3 +45,18 @@ export function clearError(el) {
   el.textContent = '';
   el.classList.remove('show');
 }
+
+export const sideLabel = s => (s === 'yes' ? 'Yes' : 'No');
+
+// Times are always shown in UK time, e.g. "today, 23:59" or "Thu 2 Oct, 18:00".
+const TZ = 'Europe/London';
+const dayKey = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+export function fmtWhen(iso) {
+  const d = new Date(iso), now = Date.now();
+  const time = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }).format(d);
+  const k = dayKey(d);
+  if (k === dayKey(new Date(now))) return `today, ${time}`;
+  if (k === dayKey(new Date(now + 864e5))) return `tomorrow, ${time}`;
+  if (k === dayKey(new Date(now - 864e5))) return `yesterday, ${time}`;
+  return `${new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' }).format(d)}, ${time}`;
+}
