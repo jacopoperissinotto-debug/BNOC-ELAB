@@ -220,6 +220,7 @@ function listsHtml() {
     ${suggestions.length ? suggestions.map(s => `<article class="call">
         <div class="call-meta"><span><b>${esc(s.name)}</b> suggested · ${fmtWhen(s.at)}</span></div>
         <h3>${esc(s.q)}</h3>
+        <div class="chips"><span class="chip">${esc((s.options || ['Yes', 'No'])[0])}</span><span class="chip">${esc((s.options || ['Yes', 'No'])[1])}</span></div>
         <div class="vote"><button class="yes" data-act="publish" data-id="${s.id}">Publish</button><button class="no" data-act="reject" data-id="${s.id}">Reject</button></div>
       </article>`).join('') : '<div class="empty">No suggestions waiting.</div>'}
     <h2 class="section-h">People (${people.length})</h2>
@@ -235,9 +236,10 @@ function closeTime() {
 async function post(btn, fromSuggestion) {
   const err = root.querySelector('#ad-err');
   clearError(err);
-  const q = fromSuggestion ? A.data.suggestions.find(s => s.id === fromSuggestion)?.q : root.querySelector('#ad-q').value.trim();
+  const suggestion = fromSuggestion && A.data.suggestions.find(s => s.id === fromSuggestion);
+  const q = suggestion ? suggestion.q : root.querySelector('#ad-q').value.trim();
   const closesAt = closeTime();
-  const options = fromSuggestion ? null : answers();
+  const options = suggestion ? (suggestion.options || null) : answers();
   if (!q || q.length < 10) return showError(err, 'Write a full question (at least 10 characters).');
   if (options && (!options[0] || !options[1])) return showError(err, 'Fill in both answers.');
   if (options && options[0].toLowerCase() === options[1].toLowerCase()) return showError(err, 'The two answers need to be different.');

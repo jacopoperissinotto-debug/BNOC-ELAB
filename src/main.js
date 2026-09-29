@@ -248,21 +248,30 @@ async function deleteComment(btn) {
 // ---------- Suggest a call ----------
 function openSuggest() {
   openSheet(`<h2 id="sheet-title">Suggest a call</h2>
-    <p class="lead">Suggest a yes/no question for everyone in ${esc(COMMUNITY.name)}. The E-Lab team checks suggestions before they go live.</p>
+    <p class="lead">Suggest a question with two possible answers for everyone in ${esc(COMMUNITY.name)}. The E-Lab team checks suggestions before they go live.</p>
     <div class="err" id="sg-err" role="alert"></div>
     <div class="field"><label for="sg-q">Your question</label><textarea id="sg-q" maxlength="140" placeholder="Will more than 40 people come to Thursday's social?"></textarea>
       <div class="hint">Not allowed: relationships, health, appearance or grades.</div></div>
+    <div class="field"><label id="sg-ans-l">The two answers</label>
+      <div class="pair" role="group" aria-labelledby="sg-ans-l">
+        <input type="text" id="sg-a0" maxlength="20" value="Yes" aria-label="First answer">
+        <input type="text" id="sg-a1" maxlength="20" value="No" aria-label="Second answer">
+      </div>
+      <div class="hint">Leave as Yes / No, or change them, e.g. "The Eagle" / "The Bath House".</div></div>
     <button class="primary" data-act="send-suggestion">Send suggestion</button>
     <button class="secondary" data-act="close">Cancel</button>`);
 }
 
 async function sendSuggestion(btn) {
   const q = $('#sg-q').value.trim(), err = $('#sg-err');
+  const options = [$('#sg-a0').value.trim(), $('#sg-a1').value.trim()];
   clearError(err);
   if (q.length < 10) return showError(err, 'Write a full question, like "Will the E-Lab social run past 10pm?"');
-  if (isBannedTopic(q)) return showError(err, BANNED_MSG);
+  if (!options[0] || !options[1]) return showError(err, 'Fill in both answers.');
+  if (options[0].toLowerCase() === options[1].toLowerCase()) return showError(err, 'The two answers need to be different.');
+  if ([q, ...options].some(isBannedTopic)) return showError(err, BANNED_MSG);
   btn.disabled = true;
-  const { error } = await api.suggest(q);
+  const { error } = await api.suggest(q, options);
   btn.disabled = false;
   if (error) return showError(err, error);
   closeSheet();

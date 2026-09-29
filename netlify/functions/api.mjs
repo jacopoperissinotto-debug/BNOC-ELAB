@@ -17,7 +17,7 @@
 //                              happened, 0 = the first answer (Yes), 1 = the second (No)
 //   f/{callId}/{uid}           { pick, conf, at }       the answer itself; written once, never overwritten
 //   fx/{callId}/{uid}/{pick}/{conf}/{at}               the same answer as a key, so one list() counts everything
-//   suggestion/{id}            { id, q, uid, name, at }
+//   suggestion/{id}            { id, q, options, uid, name, at }      options: two answers (missing = Yes/No)
 //   comment/{callId}/{at}.{uid}.{cid}  { cid, uid, pid, name, text, at }   comments on a call, oldest first
 //   config/reward              { prize, sponsor, who, when, details }       the prize on the Rewards page (set by admin)
 import { getStore } from '@netlify/blobs';
@@ -267,10 +267,12 @@ async function forecast(st, me, body) {
 
 async function suggest(st, me, body) {
   let q = clean(body.q, 140);
+  const { options, error } = parseOptions(body.options);
   if (q.length < 10) return fail(400, 'Write a full question, like "Will the E-Lab social run past 10pm?"');
-  if (isBannedTopic(q)) return fail(422, BANNED_MSG);
+  if (error) return fail(400, error);
+  if (isBannedTopic(q) || (options || []).some(isBannedTopic)) return fail(422, BANNED_MSG);
   if (!q.endsWith('?')) q += '?';
-  const s = { id: newId(), q, uid: me.id, name: me.name, at: new Date().toISOString() };
+  const s = { id: newId(), q, options, uid: me.id, name: me.name, at: new Date().toISOString() };
   await st.setJSON(`suggestion/${s.id}`, s);
   return json(200, { ok: true });
 }
