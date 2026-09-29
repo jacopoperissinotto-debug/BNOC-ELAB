@@ -1,7 +1,7 @@
 // BNOC pitch app: join, make calls, see the leaderboard. The admin page lives in admin.js (#/admin).
 import './styles.css';
 import { api, getToken, setToken } from './api.js';
-import { $, esc, ord, toast, openSheet, closeSheet, showError, clearError, avatar, sideLabel, fmtWhen } from './ui.js';
+import { $, esc, ord, toast, openSheet, closeSheet, showError, clearError, avatar, fmtWhen } from './ui.js';
 import { CONF, COMMUNITY, isCamEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../shared/rules.js';
 import { renderAdmin, refreshAdmin } from './admin.js';
 
@@ -17,6 +17,9 @@ const S = {
 };
 
 const me = () => S.state?.me;
+// Every call has two answers: Yes/No, or two labels the admin chose. Answer 0 is coral, answer 1 plum.
+const answer = (c, pick) => c.options[pick];
+const tag = (c, pick) => `<span class="side-tag ${pick === 0 ? 'y' : 'n'}">${esc(answer(c, pick))}</span>`;
 
 // ---------- Join ----------
 function renderGate() {
@@ -80,11 +83,11 @@ function renderAdminPage() {
 const KE_AVATAR = `<span class="avatar" style="background:var(--plum)" aria-hidden="true">${COMMUNITY.short}</span>`;
 
 function callCard(c) {
-  const total = c.yes + c.no, p = total ? Math.round(c.yes / total * 100) : 50;
+  const total = c.total, p = total ? Math.round(c.counts[0] / total * 100) : 50;
   let chips = '';
   if (c.status === 'closed') chips += '<span class="chip wait">Closed · result coming soon</span>';
   if (c.status === 'settled') {
-    chips += `<span class="chip">Result: ${sideLabel(c.result)}</span>`;
+    chips += `<span class="chip">Result: ${esc(answer(c, c.result))}</span>`;
     if (c.mine) {
       chips += c.mine.pts > 0
         ? `<span class="chip won">You called it: +${c.mine.pts}</span>`
@@ -93,10 +96,10 @@ function callCard(c) {
   }
   let action = '';
   if (c.status === 'open' && !c.mine) {
-    action = `<div class="vote"><button class="yes" data-act="call" data-id="${c.id}" data-side="yes">Yes</button><button class="no" data-act="call" data-id="${c.id}" data-side="no">No</button></div>`;
+    action = `<div class="vote"><button class="yes" data-act="call" data-id="${c.id}" data-pick="0">${esc(answer(c, 0))}</button><button class="no" data-act="call" data-id="${c.id}" data-pick="1">${esc(answer(c, 1))}</button></div>`;
   } else if (c.mine && c.status !== 'settled') {
     const cf = CONF[c.mine.conf];
-    action = `<div class="my-stake"><span>You called <span class="side-tag ${c.mine.side === 'yes' ? 'y' : 'n'}">${sideLabel(c.mine.side)}</span> · ${cf.label}</span><span>+${cf.win} if right</span></div>`;
+    action = `<div class="my-stake"><span>You called ${tag(c, c.mine.pick)} · ${cf.label}</span><span>+${cf.win} if right</span></div>`;
   }
   const when = c.status === 'open' ? `Closes ${fmtWhen(c.closesAt)}` : c.status === 'closed' ? `Closed ${fmtWhen(c.closesAt)}` : 'Settled';
   return `<article class="call">
@@ -104,7 +107,7 @@ function callCard(c) {
     <h3>${esc(c.q)}</h3>
     ${chips ? `<div class="chips">${chips}</div>` : ''}
     ${total
-      ? `<div class="bar" role="img" aria-label="The crowd says ${p}% Yes"><div class="y" style="width:${Math.min(Math.max(p, 16), 84)}%">Yes ${p}%</div><div class="n">No ${100 - p}%</div></div>`
+      ? `<div class="bar" role="img" aria-label="The crowd says ${p}% ${esc(answer(c, 0))}, ${100 - p}% ${esc(answer(c, 1))}"><div class="y" style="width:${Math.min(Math.max(p, 24), 76)}%"><span class="lbl">${esc(answer(c, 0))}</span><b>${p}%</b></div><div class="n"><span class="lbl">${esc(answer(c, 1))}</span><b>${100 - p}%</b></div></div>`
       : `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`}
     <div class="call-foot"><span>${total ? `${total} ${total === 1 ? 'person' : 'people'} called it · ` : ''}${when}</span></div>
     ${action}
@@ -127,16 +130,16 @@ function renderCalls() {
     ${shown.length ? shown.map(callCard).join('') : `<div class="empty">${empty}</div>`}`;
 }
 
-function openCall(id, side) {
+function openCall(id, pick) {
   const c = S.state.calls.find(x => x.id === id);
   if (!c) return;
-  S.callCtx = { id, side, conf: 'sure' };
+  S.callCtx = { id, pick, conf: 'sure' };
   openSheet(`<h2 id="sheet-title">${esc(c.q)}</h2>
-    <p class="lead">You're calling <span class="side-tag ${side === 'yes' ? 'y' : 'n'}">${sideLabel(side)}</span>. How sure are you?</p>
+    <p class="lead">You're calling ${tag(c, pick)}. How sure are you?</p>
     <div class="conf" role="group" aria-label="Confidence">${Object.entries(CONF).map(([k, v]) => `<button data-act="conf" data-k="${k}" aria-pressed="${k === 'sure'}"><b>${v.label}</b><span>${v.pct}</span></button>`).join('')}</div>
     <div class="est" id="call-est"></div>
     <div class="err" id="call-err" role="alert"></div>
-    <button class="primary" data-act="confirm-call">Call ${sideLabel(side)}</button>
+    <button class="primary" data-act="confirm-call">Call ${esc(answer(c, pick))}</button>
     <button class="secondary" data-act="close">Cancel</button>
     <p class="lead center" style="font-size:12.5px;margin:12px 0 0">Calls are locked once made.</p>`);
   updateEst();
@@ -148,9 +151,10 @@ function updateEst() {
 }
 
 async function confirmCall(btn) {
-  const { id, side, conf } = S.callCtx;
+  const { id, pick, conf } = S.callCtx;
+  const label = answer(S.state.calls.find(x => x.id === id), pick);
   btn.disabled = true;
-  const { data, error } = await api.forecast(id, side, conf);
+  const { data, error } = await api.forecast(id, pick, conf);
   btn.disabled = false;
   if (error) {
     showError($('#call-err'), error);
@@ -159,7 +163,7 @@ async function confirmCall(btn) {
   }
   S.state = data.state;
   closeSheet(); render();
-  toast(`Called ${sideLabel(side)}, ${CONF[conf].label.toLowerCase()}`);
+  toast(`Called ${label}, ${CONF[conf].label.toLowerCase()}`);
 }
 
 // ---------- Suggest a call ----------
@@ -216,7 +220,7 @@ function scoringTable() {
 function renderHow() {
   return `<h1 class="page-title">How it works</h1>
     <p class="page-sub">Forecasting, not betting. There's no money anywhere.</p>
-    <div class="rules"><b>1. Make a call.</b> Pick Yes or No on a question about ${esc(COMMUNITY.name)}, and say how sure you are:
+    <div class="rules"><b>1. Make a call.</b> Pick one of the two answers (usually Yes or No) on a question about ${esc(COMMUNITY.name)}, and say how sure you are:
       ${scoringTable()}
       <b>2. Wait for the result.</b> Calls lock at their closing time, then the E-Lab team settles them.<br>
       <b>3. Climb the table.</b> You never put points in, so you can't lose anything you own. Honest confidence scores best over a season.<br><br>
@@ -234,7 +238,7 @@ function renderMe() {
       const p = c.mine.pts;
       return `<li><span>${p > 0 ? 'Right' : 'Wrong'}: ${esc(short)}</span><span class="${p >= 0 ? 'plus' : 'minus'}">${p > 0 ? '+' + p : p < 0 ? '−' + (-p) : '0'}</span></li>`;
     }
-    return `<li><span>Called ${sideLabel(c.mine.side)} (${CONF[c.mine.conf].label.toLowerCase()}): ${esc(short)}</span><span>·</span></li>`;
+    return `<li><span>Called ${esc(answer(c, c.mine.pick))} (${CONF[c.mine.conf].label.toLowerCase()}): ${esc(short)}</span><span>·</span></li>`;
   });
   return `<h1 class="page-title">Me</h1>
     <div class="balance"><div class="big">${s.score}</div><div class="lbl">season score · ${s.settled ? `${ord(s.rank)} of ${s.people}` : 'no results yet'} in ${esc(COMMUNITY.name)}</div>
@@ -316,7 +320,7 @@ document.addEventListener('click', e => {
     case 'join': onJoin(b); break;
     case 'tab': closeSheet(); location.hash = `#/${b.dataset.tab}`; break;
     case 'filter': S.filter = b.dataset.f; render(); break;
-    case 'call': openCall(id, b.dataset.side); break;
+    case 'call': openCall(id, Number(b.dataset.pick)); break;
     case 'conf':
       S.callCtx.conf = b.dataset.k;
       document.querySelectorAll('[data-act="conf"]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.k === S.callCtx.conf)));

@@ -46,8 +46,6 @@ export function clearError(el) {
   el.classList.remove('show');
 }
 
-export const sideLabel = s => (s === 'yes' ? 'Yes' : 'No');
-
 // Times are always shown in UK time, e.g. "today, 23:59" or "Thu 2 Oct, 18:00".
 const TZ = 'Europe/London';
 const dayKey = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);

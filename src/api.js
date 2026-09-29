@@ -31,12 +31,12 @@ async function call(method, path, body, { admin = false } = {}) {
 export const api = {
   state: () => call('GET', 'state'),
   join: (name, email) => call('POST', 'join', { name, email }),
-  forecast: (callId, side, conf) => call('POST', 'forecast', { callId, side, conf }),
+  forecast: (callId, pick, conf) => call('POST', 'forecast', { callId, pick, conf }),
   suggest: q => call('POST', 'suggest', { q }),
   deleteMe: () => call('POST', 'delete-me', {}),
   admin: {
     state: () => call('GET', 'admin', null, { admin: true }),
-    createCall: (q, closesAt, fromSuggestion) => call('POST', 'admin/calls', { q, closesAt, fromSuggestion }, { admin: true }),
+    createCall: (q, closesAt, fromSuggestion, options) => call('POST', 'admin/calls', { q, closesAt, fromSuggestion, options }, { admin: true }),
     updateCall: (id, action, extra = {}) => call('POST', `admin/calls/${id}`, { action, ...extra }, { admin: true }),
     rejectSuggestion: id => call('POST', `admin/suggestions/${id}`, {}, { admin: true }),
     removePerson: id => call('POST', `admin/people/${id}`, {}, { admin: true })

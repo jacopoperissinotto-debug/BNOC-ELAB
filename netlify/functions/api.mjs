@@ -11,9 +11,11 @@
 //                              accounts); pid is a random id, the only one phones ever see.
 //   email/{sha(email)}         { uid }                  one account per email
 //   session/{sha(token)}       { uid }                  "this phone is logged in as…"
-//   call/{id}                  { id, q, closesAt, createdAt, result, settledAt, void }
-//   f/{callId}/{uid}           { side, conf, at }       the answer itself; written once, never overwritten
-//   fx/{callId}/{uid}/{side}/{conf}/{at}               the same answer as a key, so one list() counts everything
+//   call/{id}                  { id, q, options, closesAt, createdAt, result, settledAt, void }
+//                              options: the two possible answers (missing = Yes/No); result: which one
+//                              happened, 0 = the first answer (Yes), 1 = the second (No)
+//   f/{callId}/{uid}           { pick, conf, at }       the answer itself; written once, never overwritten
+//   fx/{callId}/{uid}/{pick}/{conf}/{at}               the same answer as a key, so one list() counts everything
 //   suggestion/{id}            { id, q, uid, name, at }
 import { getStore } from '@netlify/blobs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -28,6 +30,20 @@ const json = (status, body) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
 });
 const fail = (status, error) => json(status, { error });
+
+// Every call has exactly two answers: Yes/No by default, or two labels the admin chose
+// ("Team A" / "Team B"). They're numbered: pick 0 is the first answer, pick 1 the second.
+// (The first version stored 'yes'/'no' instead of numbers; those still read correctly.)
+const YES_NO = ['Yes', 'No'];
+const MAX_OPTIONS = 2;
+const optionsOf = c => (Array.isArray(c.options) && c.options.length === 2 ? c.options : YES_NO);
+const toPick = v => {
+  if (v === 'yes') return 0;
+  if (v === 'no') return 1;
+  const n = typeof v === 'number' ? v : /^\d+$/.test(String(v ?? '')) ? Number(v) : NaN;
+  return Number.isInteger(n) && n >= 0 && n < MAX_OPTIONS ? n : null;
+};
+const resultOf = c => (c.result === null || c.result === undefined ? null : toPick(c.result));
 
 // ---------- Reading everything (small pilot: tens of people, a handful of calls) ----------
 // Kept for a few seconds so 20 phones refreshing at once don't each re-read the whole store.
@@ -50,9 +66,9 @@ async function loadWorld(st) {
   // One answer per person per call: if two ever slip through at the same instant, the first one counts.
   const first = new Map();
   for (const k of fxKeys) {
-    const [, callId, uid, side, conf, at] = k.split('/');
-    const f = { callId, uid, side, conf, at: Number(at) };
-    if (!CONF[f.conf] || (f.side !== 'yes' && f.side !== 'no')) continue;
+    const [, callId, uid, pick, conf, at] = k.split('/');
+    const f = { callId, uid, pick: toPick(pick), conf, at: Number(at) };
+    if (!CONF[f.conf] || f.pick === null) continue;
     const prev = first.get(`${callId}/${uid}`);
     if (!prev || f.at < prev.at) first.set(`${callId}/${uid}`, f);
   }
@@ -65,7 +81,7 @@ async function loadWorld(st) {
 // ---------- Rules ----------
 function statusOf(c, now = Date.now()) {
   if (c.void) return 'void';
-  if (c.result) return 'settled';
+  if (resultOf(c) !== null) return 'settled';
   return now >= Date.parse(c.closesAt) ? 'closed' : 'open';
 }
 
@@ -73,9 +89,9 @@ function statusOf(c, now = Date.now()) {
 const inTime = (f, c) => f.at <= Date.parse(c.closesAt);
 
 function pointsFor(f, c) {
-  if (!c || c.void || !c.result || !inTime(f, c)) return null;
+  if (!c || c.void || resultOf(c) === null || !inTime(f, c)) return null;
   const cf = CONF[f.conf];
-  return f.side === c.result ? cf.win : -cf.lose;
+  return f.pick === resultOf(c) ? cf.win : -cf.lose;
 }
 
 function scoreboard(world) {
@@ -101,11 +117,19 @@ function callOrder(a, b) {
   return Date.parse(a.closesAt) - Date.parse(b.closesAt);
 }
 
+// How many people picked each answer.
 function tally(world, call) {
-  const fs = world.forecasts.filter(f => f.callId === call.id && inTime(f, call));
-  const yes = fs.filter(f => f.side === 'yes').length;
-  return { yes, no: fs.length - yes };
+  const counts = optionsOf(call).map(() => 0);
+  for (const f of world.forecasts) {
+    if (f.callId === call.id && inTime(f, call) && f.pick < counts.length) counts[f.pick]++;
+  }
+  return { counts, total: counts.reduce((a, b) => a + b, 0) };
 }
+
+const callSummary = (world, c) => ({
+  id: c.id, q: c.q, options: optionsOf(c), closesAt: c.closesAt, status: statusOf(c), result: resultOf(c),
+  ...tally(world, c)
+});
 
 // What one person sees. Other people's individual answers and emails are never sent.
 function publicState(world, me) {
@@ -113,9 +137,8 @@ function publicState(world, me) {
   const calls = world.calls.filter(c => !c.void).sort(callOrder).map(c => {
     const mineF = me && world.forecasts.find(f => f.callId === c.id && f.uid === me.id && inTime(f, c));
     return {
-      id: c.id, q: c.q, closesAt: c.closesAt, status: statusOf(c), result: c.result || null,
-      ...tally(world, c),
-      mine: mineF ? { side: mineF.side, conf: mineF.conf, pts: pointsFor(mineF, c) } : null
+      ...callSummary(world, c),
+      mine: mineF ? { pick: mineF.pick, conf: mineF.conf, pts: pointsFor(mineF, c) } : null
     };
   });
   const mine = me && board.find(r => r.id === me.id);
@@ -201,18 +224,19 @@ async function deleteUser(st, me) {
 
 // ---------- Calls ----------
 async function forecast(st, me, body) {
-  const { callId, side, conf } = body;
-  if (side !== 'yes' && side !== 'no') return fail(400, 'Pick Yes or No.');
+  const { callId, conf } = body;
+  const pick = toPick(body.pick ?? body.side);
   if (!CONF[conf]) return fail(400, 'Pick how sure you are.');
   const call = typeof callId === 'string' && await st.get(`call/${callId}`, { type: 'json' });
   if (!call || call.void) return fail(404, "That call isn't available any more.");
+  if (pick === null || pick >= optionsOf(call).length) return fail(400, 'Pick one of the answers.');
   if (statusOf(call) !== 'open') return fail(409, 'This call has closed, so answers are locked.');
 
   const at = Date.now();
-  const first = await st.setJSON(`f/${call.id}/${me.id}`, { side, conf, at }, { onlyIfNew: true });
+  const first = await st.setJSON(`f/${call.id}/${me.id}`, { pick, conf, at }, { onlyIfNew: true });
   if (!first.modified) return fail(409, "You've already made this call. Calls are locked once made.");
   try {
-    await st.set(`fx/${call.id}/${me.id}/${side}/${conf}/${at}`, '1');
+    await st.set(`fx/${call.id}/${me.id}/${pick}/${conf}/${at}`, '1');
   } catch (err) {
     await st.delete(`f/${call.id}/${me.id}`).catch(() => {});
     throw err;
@@ -245,22 +269,33 @@ async function adminState(st) {
   const suggestions = (await Promise.all((await keys(st, 'suggestion/')).map(k => st.get(k, { type: 'json' }))))
     .filter(Boolean).sort((a, b) => b.at.localeCompare(a.at));
   return json(200, {
-    calls: world.calls.filter(c => !c.void).sort(callOrder).map(c => ({
-      id: c.id, q: c.q, closesAt: c.closesAt, status: statusOf(c), result: c.result || null, ...tally(world, c)
-    })),
+    calls: world.calls.filter(c => !c.void).sort(callOrder).map(c => callSummary(world, c)),
     suggestions,
     people: board.map(({ id, name, score, rank }) => ({ id, name, score, rank, email: world.users.find(u => u.id === id)?.email }))
   });
 }
 
+// No answers given, or plain Yes/No = a Yes/No call. Otherwise exactly two different labels, up to 20 characters.
+function parseOptions(raw) {
+  if (raw === undefined || raw === null) return { options: null };
+  if (!Array.isArray(raw) || raw.length !== 2) return { error: 'Every call needs exactly two answers.' };
+  const options = raw.map(o => clean(o, 20));
+  if (!options[0] || !options[1]) return { error: 'Fill in both answers.' };
+  if (options[0].toLowerCase() === options[1].toLowerCase()) return { error: 'The two answers need to be different.' };
+  if (options[0].toLowerCase() === 'yes' && options[1].toLowerCase() === 'no') return { options: null };
+  return { options };
+}
+
 async function createCall(st, body) {
   let q = clean(body.q, 140);
   const closesAt = parseClose(body.closesAt);
+  const { options, error } = parseOptions(body.options);
   if (q.length < 10) return fail(400, 'Write a full question (at least 10 characters).');
+  if (error) return fail(400, error);
   if (!closesAt) return fail(400, 'Pick when the call closes.');
   if (Date.parse(closesAt) <= Date.now()) return fail(400, 'The closing time needs to be in the future.');
   if (!q.endsWith('?')) q += '?';
-  const call = { id: newId(), q, closesAt, createdAt: new Date().toISOString(), result: null, settledAt: null, void: false };
+  const call = { id: newId(), q, options, closesAt, createdAt: new Date().toISOString(), result: null, settledAt: null, void: false };
   await st.setJSON(`call/${call.id}`, call);
   if (body.fromSuggestion) await st.delete(`suggestion/${String(body.fromSuggestion)}`);
   return adminState(st);
@@ -282,12 +317,14 @@ async function updateCall(st, id, body) {
       call.closesAt = closesAt;
       break;
     }
-    case 'settle':
-      if (body.result !== 'yes' && body.result !== 'no') return fail(400, 'Pick Yes or No.');
+    case 'settle': {
+      const result = toPick(body.result);
+      if (result === null || result >= optionsOf(call).length) return fail(400, 'Pick the answer that happened.');
       if (status === 'open') return fail(409, 'Close the call before settling it, so nobody can answer after the result is known.');
-      call.result = body.result;
+      call.result = result;
       call.settledAt = new Date().toISOString();
       break;
+    }
     case 'unsettle':
       call.result = null;
       call.settledAt = null;

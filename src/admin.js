@@ -2,7 +2,7 @@
 // see who joined, and show the join QR code for the pitch. Unlocked with the ADMIN_KEY passphrase.
 import QRCode from 'qrcode';
 import { api, getAdminKey, setAdminKey } from './api.js';
-import { esc, toast, showError, clearError, sideLabel, fmtWhen } from './ui.js';
+import { esc, toast, showError, clearError, fmtWhen } from './ui.js';
 
 const A = { data: null, error: null };
 
@@ -43,6 +43,12 @@ export function renderAdmin(el) {
       <div class="field"><label for="ad-q">Question</label><textarea id="ad-q" maxlength="140" placeholder="Will our pitch be under 3 minutes?"></textarea>
         <div class="hint">Ideas (tap to use, then edit if you like):</div>
         <div class="opts" style="flex-direction:column;margin-top:6px">${IDEAS.map((q, i) => `<button class="opt" style="text-align:left;font-weight:500" data-act="idea" data-i="${i}">${esc(q)}</button>`).join('')}</div></div>
+      <div class="field"><label id="ad-ans-l">The two answers</label>
+        <div class="pair" role="group" aria-labelledby="ad-ans-l">
+          <input type="text" id="ad-a0" maxlength="20" value="Yes" aria-label="First answer">
+          <input type="text" id="ad-a1" maxlength="20" value="No" aria-label="Second answer">
+        </div>
+        <div class="hint">Leave as Yes / No, or change them, e.g. "Team A" / "Team B".</div></div>
       <div class="field"><label for="ad-close">Closes (UK time)</label>
         <div class="opts" style="margin-bottom:8px">
           <button class="opt" data-act="preset" data-k="hour">In 1 hour</button>
@@ -88,10 +94,21 @@ function handleError(error, status) {
   }
 }
 
+const answer = (c, pick) => c.options[pick];
+const isYesNo = c => c.options[0] === 'Yes' && c.options[1] === 'No';
+
+function answers() {
+  return [root.querySelector('#ad-a0').value.trim(), root.querySelector('#ad-a1').value.trim()];
+}
+function resetAnswers() {
+  root.querySelector('#ad-a0').value = 'Yes';
+  root.querySelector('#ad-a1').value = 'No';
+}
+
 function statusChip(c) {
   if (c.status === 'open') return `<span class="chip ok">Live · closes ${fmtWhen(c.closesAt)}</span>`;
   if (c.status === 'closed') return '<span class="chip wait">Closed · needs a result</span>';
-  return `<span class="chip won">Settled: ${sideLabel(c.result)}</span>`;
+  return `<span class="chip won">Settled: ${esc(answer(c, c.result))}</span>`;
 }
 
 function callAdminCard(c) {
@@ -99,15 +116,18 @@ function callAdminCard(c) {
   if (c.status === 'open') {
     action = `<button class="settle-btn" data-act="close-call" data-id="${c.id}">Close now</button>`;
   } else if (c.status === 'closed') {
-    action = `<div class="vote"><button class="yes" data-act="settle" data-id="${c.id}" data-r="yes">It happened: Yes</button><button class="no" data-act="settle" data-id="${c.id}" data-r="no">It didn't: No</button></div>
+    action = isYesNo(c)
+      ? `<div class="vote"><button class="yes" data-act="settle" data-id="${c.id}" data-r="0">It happened: Yes</button><button class="no" data-act="settle" data-id="${c.id}" data-r="1">It didn't: No</button></div>`
+      : `<div class="vote"><button class="yes" data-act="settle" data-id="${c.id}" data-r="0">It was: ${esc(answer(c, 0))}</button><button class="no" data-act="settle" data-id="${c.id}" data-r="1">It was: ${esc(answer(c, 1))}</button></div>`;
+    action += `
       <button class="link-btn" data-act="reopen" data-id="${c.id}">Reopen until the time above</button>`;
   } else {
-    action = `<div class="my-stake"><span>Result: <b>${sideLabel(c.result)}</b>. Scores updated.</span><button class="link-btn" data-act="unsettle" data-id="${c.id}">Undo</button></div>`;
+    action = `<div class="my-stake"><span>Result: <b>${esc(answer(c, c.result))}</b>. Scores updated.</span><button class="link-btn" data-act="unsettle" data-id="${c.id}">Undo</button></div>`;
   }
   return `<article class="call">
     <h3>${esc(c.q)}</h3>
     <div class="chips">${statusChip(c)}</div>
-    <div class="call-foot"><span><b>${c.yes}</b> Yes · <b>${c.no}</b> No</span><button class="report" data-act="remove" data-id="${c.id}">Remove call</button></div>
+    <div class="call-foot"><span><b>${c.counts[0]}</b> ${esc(answer(c, 0))} · <b>${c.counts[1]}</b> ${esc(answer(c, 1))}</span><button class="report" data-act="remove" data-id="${c.id}">Remove call</button></div>
     ${action}
   </article>`;
 }
@@ -138,17 +158,20 @@ async function post(btn, fromSuggestion) {
   clearError(err);
   const q = fromSuggestion ? A.data.suggestions.find(s => s.id === fromSuggestion)?.q : root.querySelector('#ad-q').value.trim();
   const closesAt = closeTime();
+  const options = fromSuggestion ? null : answers();
   if (!q || q.length < 10) return showError(err, 'Write a full question (at least 10 characters).');
+  if (options && (!options[0] || !options[1])) return showError(err, 'Fill in both answers.');
+  if (options && options[0].toLowerCase() === options[1].toLowerCase()) return showError(err, 'The two answers need to be different.');
   if (!closesAt) return showError(err, 'Pick when the call closes.');
   btn.disabled = true;
-  const { data, error, status } = await api.admin.createCall(q, closesAt, fromSuggestion);
+  const { data, error, status } = await api.admin.createCall(q, closesAt, fromSuggestion, options);
   btn.disabled = false;
   if (error) {
     if (status === 401 || status === 503) return handleError(error, status);
     showError(err, error);
     return err.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
-  if (!fromSuggestion) root.querySelector('#ad-q').value = '';
+  if (!fromSuggestion) { root.querySelector('#ad-q').value = ''; resetAnswers(); }
   A.data = data;
   root.querySelector('#admin-lists').innerHTML = listsHtml();
   toast(`Posted. Closes ${fmtWhen(closesAt)}`);
@@ -225,7 +248,7 @@ document.addEventListener('click', e => {
       break;
     }
     case 'forget-key': setAdminKey(''); A.data = null; renderAdmin(root); break;
-    case 'idea': root.querySelector('#ad-q').value = IDEAS[Number(b.dataset.i)]; root.querySelector('#ad-q').focus(); break;
+    case 'idea': root.querySelector('#ad-q').value = IDEAS[Number(b.dataset.i)]; resetAnswers(); root.querySelector('#ad-q').focus(); break;
     case 'preset': root.querySelector('#ad-close').value = toLocalInput(preset(b.dataset.k)); break;
     case 'post': post(b); break;
     case 'post-ideas': postIdeas(b); break;
@@ -242,8 +265,11 @@ document.addEventListener('click', e => {
       if (confirm(`Close "${find()?.q}" now? Nobody can answer after this.`)) update(b, id, 'close', {}, 'Closed. Answers are locked.');
       break;
     case 'settle':
-      if (confirm(`Settle "${find()?.q}" as ${sideLabel(b.dataset.r).toUpperCase()}? Scores update straight away.`)) {
-        update(b, id, 'settle', { result: b.dataset.r }, `Settled as ${sideLabel(b.dataset.r)}. Scores updated.`);
+      {
+        const c = find(), label = c && answer(c, Number(b.dataset.r));
+        if (c && confirm(`Settle "${c.q}" as "${label}"? Scores update straight away.`)) {
+          update(b, id, 'settle', { result: Number(b.dataset.r) }, `Settled as ${label}. Scores updated.`);
+        }
       }
       break;
     case 'unsettle':
