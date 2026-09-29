@@ -24,10 +24,11 @@ function preset(kind) {
   if (kind === 'hour') { d.setHours(d.getHours() + 1); return d; }
   if (kind === 'tonight') { d.setHours(23, 59, 0, 0); return d; }
   d.setDate(d.getDate() + 1);
-  d.setHours(kind === 'noon' ? 12 : 18, 0, 0, 0);
+  if (kind === 'late') d.setHours(23, 59, 0, 0);
+  else d.setHours(kind === 'noon' ? 12 : 18, 0, 0, 0);
   return d;
 }
-const defaultClose = () => (new Date().getHours() < 23 ? preset('tonight') : preset('evening'));
+const defaultClose = () => preset('late');
 
 export function renderAdmin(el) {
   root = el;
@@ -48,6 +49,7 @@ export function renderAdmin(el) {
           <button class="opt" data-act="preset" data-k="tonight">Tonight 23:59</button>
           <button class="opt" data-act="preset" data-k="noon">Tomorrow 12:00</button>
           <button class="opt" data-act="preset" data-k="evening">Tomorrow 18:00</button>
+          <button class="opt" data-act="preset" data-k="late">Tomorrow 23:59</button>
         </div>
         <input type="datetime-local" id="ad-close" value="${toLocalInput(defaultClose())}">
         <div class="hint">Answers lock automatically at this time. Suggestions you publish below use it too.</div></div>
@@ -74,10 +76,13 @@ export async function refreshAdmin() {
 }
 
 function handleError(error, status) {
-  if (status === 401 || status === 503) {
+  if (status === 401) {
     A.error = error;
-    if (status === 401) setAdminKey('');
+    setAdminKey('');
     renderAdmin(root);
+  } else if (status === 503) {
+    const lists = root.querySelector('#admin-lists');
+    if (lists) lists.innerHTML = `<div class="err show" role="alert">${esc(error)} Then redeploy the site.</div>`;
   } else {
     toast(error);
   }
