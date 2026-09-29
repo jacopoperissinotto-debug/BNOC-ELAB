@@ -103,7 +103,7 @@ function callCard(c) {
     <div class="call-meta">${KE_AVATAR}<span><b>${esc(COMMUNITY.name)}</b> · official call</span></div>
     <h3>${esc(c.q)}</h3>
     ${chips ? `<div class="chips">${chips}</div>` : ''}
-    <div class="bar" role="img" aria-label="The crowd says ${p}% Yes"><div class="y" style="width:${Math.max(p, 14)}%">Yes ${p}%</div><div class="n">No ${100 - p}%</div></div>
+    <div class="bar" role="img" aria-label="The crowd says ${p}% Yes"><div class="y" style="width:${Math.min(Math.max(p, 16), 84)}%">Yes ${p}%</div><div class="n">No ${100 - p}%</div></div>
     <div class="call-foot"><span>${total} ${total === 1 ? 'person' : 'people'} called it · ${when}</span></div>
     ${action}
   </article>`;

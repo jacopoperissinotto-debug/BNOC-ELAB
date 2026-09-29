@@ -14,3 +14,7 @@ supabase/.branches/
 # Mac / editor clutter
 .DS_Store
 *.log
+
+# Local Netlify folder
+.netlify
+deno.lock
