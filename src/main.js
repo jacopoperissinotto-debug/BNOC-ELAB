@@ -7,14 +7,19 @@ import { renderAdmin, refreshAdmin } from './admin.js';
 
 const TABS = ['calls', 'ranks', 'how', 'me', 'admin'];
 const REFRESH_MS = 15000;
+const COMMENTS_REFRESH_MS = 6000;
+const COMMENT_MAX = 280;
+const BUBBLE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
 
 const S = {
   state: null,        // what the server says: me, calls, board, score, rank, people
   loaded: false,
   tab: 'calls',
   filter: 'live',     // 'live' | 'mine' | 'settled'
-  callCtx: null       // the call being answered in the confidence sheet
+  callCtx: null,      // the call being answered in the confidence sheet
+  commentsFor: null   // the call whose comments are open
 };
+let commentsTimer = null;
 
 const me = () => S.state?.me;
 // Every call has two answers: Yes/No, or two labels the admin chose. Answer 0 is coral, answer 1 plum.
@@ -109,7 +114,8 @@ function callCard(c) {
     ${total
       ? `<div class="bar" role="img" aria-label="The crowd says ${p}% ${esc(answer(c, 0))}, ${100 - p}% ${esc(answer(c, 1))}"><div class="y" style="width:${Math.min(Math.max(p, 24), 76)}%"><span class="lbl">${esc(answer(c, 0))}</span><b>${p}%</b></div><div class="n"><span class="lbl">${esc(answer(c, 1))}</span><b>${100 - p}%</b></div></div>`
       : `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`}
-    <div class="call-foot"><span>${total ? `${total} ${total === 1 ? 'person' : 'people'} called it · ` : ''}${when}</span></div>
+    <div class="call-foot"><span>${total ? `${total} ${total === 1 ? 'person' : 'people'} called it · ` : ''}${when}</span>
+      <button class="cmt-btn" data-act="comments" data-id="${c.id}" aria-label="${c.comments} comments">${BUBBLE}${c.comments || 'Comment'}</button></div>
     ${action}
   </article>`;
 }
@@ -164,6 +170,81 @@ async function confirmCall(btn) {
   S.state = data.state;
   closeSheet(); render();
   toast(`Called ${label}, ${CONF[conf].label.toLowerCase()}`);
+}
+
+// ---------- Comments ----------
+function openComments(id) {
+  const c = S.state.calls.find(x => x.id === id);
+  if (!c) return;
+  S.commentsFor = id;
+  S.commentsFresh = true;   // the first draw jumps to the newest comment, like a chat
+  openSheet(`<h2 id="sheet-title">Comments</h2>
+    <p class="lead">${esc(c.q)}</p>
+    <div class="cmts" id="cmts" aria-live="polite"><div class="empty">Loading…</div></div>
+    <div class="err" id="cm-err" role="alert"></div>
+    <div class="field"><label class="sr" for="cm-text">Your comment</label>
+      <textarea id="cm-text" maxlength="${COMMENT_MAX}" placeholder="Add a comment…"></textarea>
+      <div class="hint">Be kind. Everyone in ${esc(COMMUNITY.name)} sees your first name. No comments about relationships, health, appearance or grades.</div></div>
+    <button class="primary" data-act="post-comment">Post comment</button>
+    <button class="secondary" data-act="close">Close</button>`);
+  loadComments();
+  clearInterval(commentsTimer);
+  commentsTimer = setInterval(() => {
+    if (!$('#sheet').classList.contains('open') || !$('#cmts')) return stopComments();
+    if (document.visibilityState === 'visible') loadComments();
+  }, COMMENTS_REFRESH_MS);
+}
+
+function stopComments() {
+  clearInterval(commentsTimer);
+  S.commentsFor = null;
+}
+
+function drawComments(list) {
+  const box = $('#cmts');
+  if (!box) return;
+  const call = S.state.calls.find(x => x.id === S.commentsFor);
+  if (call) call.comments = list.length;   // keeps the count on the card right when the sheet closes
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.innerHTML = list.length ? list.map(m => `<div class="cmt">
+      ${avatar(m.pid, m.name)}
+      <div class="cmt-body"><div class="cmt-meta"><b>${esc(m.mine ? 'You' : m.name)}</b> · ${fmtWhen(m.at)}
+        ${m.mine ? `<button class="link-btn" data-act="delete-comment" data-cid="${esc(m.id)}">Delete</button>` : ''}</div>
+        <div class="cmt-text">${esc(m.text)}</div></div>
+    </div>`).join('') : '<div class="empty">No comments yet. Start the conversation.</div>';
+  if (nearBottom || S.commentsFresh) box.scrollTop = box.scrollHeight;
+  S.commentsFresh = false;
+}
+
+async function loadComments() {
+  const id = S.commentsFor;
+  const { data, error } = await api.comments(id);
+  if (id !== S.commentsFor) return;
+  if (error) { if ($('#cmts')) $('#cmts').innerHTML = `<div class="empty">${esc(error)}</div>`; return; }
+  drawComments(data.comments);
+}
+
+async function postComment(btn) {
+  const text = $('#cm-text').value.trim(), err = $('#cm-err');
+  clearError(err);
+  if (!text) return showError(err, 'Write something first.');
+  if (isBannedTopic(text)) return showError(err, "This comment can't be posted. BNOC doesn't allow comments about relationships, health, appearance or grades.");
+  btn.disabled = true;
+  const { data, error } = await api.addComment(S.commentsFor, text);
+  btn.disabled = false;
+  if (error) return showError(err, error);
+  $('#cm-text').value = '';
+  const box = $('#cmts');
+  drawComments(data.comments);
+  box.scrollTop = box.scrollHeight;
+}
+
+async function deleteComment(btn) {
+  if (!confirm('Delete your comment?')) return;
+  btn.disabled = true;
+  const { data, error } = await api.deleteComment(S.commentsFor, btn.dataset.cid);
+  if (error) { btn.disabled = false; return toast(error); }
+  drawComments(data.comments);
 }
 
 // ---------- Suggest a call ----------
@@ -254,11 +335,11 @@ function renderMe() {
 function openPrivacy() {
   openSheet(`<h2 id="sheet-title">Privacy notice</h2>
     <div class="privacy-text">
-      <p><b>What we collect.</b> Your first name, your Cambridge email address, and the calls you make (Yes/No, how sure you were, and when).</p>
+      <p><b>What we collect.</b> Your first name, your Cambridge email address, the calls you make (your answer, how sure you were, and when), and any comments you post.</p>
       <p><b>Why.</b> Only to run BNOC: to work out results and scores, and to show the leaderboard. No ads, and we never sell your data.</p>
-      <p><b>Who can see it.</b> Other members see your first name and score. They see how many people said Yes or No on each call, but never your individual calls or your email. The small E-Lab team running the pilot can see names, emails and scores, to run the game and contact winners.</p>
+      <p><b>Who can see it.</b> Other members see your first name, your score and any comments you post. They see how many people picked each answer on a call, but never your individual calls or your email. The small E-Lab team running the pilot can see names, emails and scores, to run the game and contact winners.</p>
       <p><b>Where it's kept.</b> On Netlify, the service that hosts BNOC.</p>
-      <p><b>Deleting your account.</b> Go to Me, then Delete my account. Your name, email and calls are removed straight away.</p>
+      <p><b>Deleting your account.</b> Go to Me, then Delete my account. Your name, email, calls and comments are removed straight away. You can also delete any single comment of yours.</p>
       <p><b>Pilot note.</b> During the pilot we don't verify email addresses, so please only use your own.</p>
     </div>
     <button class="primary" data-act="close">Got it</button>`);
@@ -273,7 +354,7 @@ function confirmSignOut() {
 
 function confirmDelete() {
   openSheet(`<h2 id="sheet-title">Delete your account?</h2>
-    <p class="lead">This removes your name, email and all your calls from BNOC straight away. You'll disappear from the leaderboard. This can't be undone.</p>
+    <p class="lead">This removes your name, email, all your calls and your comments from BNOC straight away. You'll disappear from the leaderboard. This can't be undone.</p>
     <div class="err" id="del-err" role="alert"></div>
     <button class="primary" data-act="delete-confirm">Delete my account</button>
     <button class="secondary" data-act="close">Keep my account</button>`);
@@ -335,11 +416,19 @@ document.addEventListener('click', e => {
     case 'sign-out-confirm': setToken(''); S.state = { ...S.state, me: null }; closeSheet(); render(); break;
     case 'delete-me': confirmDelete(); break;
     case 'delete-confirm': deleteAccount(b); break;
+    case 'comments': openComments(id); break;
+    case 'post-comment': postComment(b); break;
+    case 'delete-comment': deleteComment(b); break;
     case 'close': closeSheet(); break;
   }
+  // Closing the sheet (Close button or tapping outside) stops the comments refreshing and updates the card.
+  if (S.commentsFor && !$('#sheet').classList.contains('open')) { stopComments(); render(); }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && $('#sheet').classList.contains('open')) closeSheet();
+  if (e.key === 'Escape' && $('#sheet').classList.contains('open')) {
+    closeSheet();
+    if (S.commentsFor) { stopComments(); render(); }
+  }
   if (e.key === 'Enter' && (e.target.id === 'ob-name' || e.target.id === 'ob-email')) $('[data-act="join"]')?.click();
 });
 window.addEventListener('hashchange', () => {

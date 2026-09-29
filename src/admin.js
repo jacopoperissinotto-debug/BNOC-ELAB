@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { api, getAdminKey, setAdminKey } from './api.js';
 import { esc, toast, showError, clearError, fmtWhen } from './ui.js';
 
-const A = { data: null, error: null };
+const A = { data: null, error: null, openComments: new Set(), comments: {} };
 
 // Ready-made questions for the pitch. Tap one to fill the question box, then edit before posting.
 const IDEAS = [
@@ -77,8 +77,25 @@ export async function refreshAdmin() {
   const { data, error, status } = await api.admin.state();
   if (error) return handleError(error, status);
   A.data = data; A.error = null;
+  await Promise.all([...A.openComments].map(fetchComments));
   const lists = root.querySelector('#admin-lists');
   if (lists) lists.innerHTML = listsHtml();
+}
+
+async function fetchComments(callId) {
+  const { data, error } = await api.admin.comments(callId);
+  if (!error) A.comments[callId] = data.comments;
+}
+
+function commentsHtml(c) {
+  if (!A.openComments.has(c.id)) return '';
+  const list = A.comments[c.id];
+  if (!list) return '<div class="empty">Loading comments…</div>';
+  if (!list.length) return '<div class="empty">No comments.</div>';
+  return `<div class="cmts admin-cmts">${list.map(m => `<div class="cmt"><div class="cmt-body">
+      <div class="cmt-meta"><b>${esc(m.name)}</b> · ${fmtWhen(m.at)}
+        <button class="link-btn" data-act="remove-comment" data-id="${c.id}" data-cid="${esc(m.id)}">Remove</button></div>
+      <div class="cmt-text">${esc(m.text)}</div></div></div>`).join('')}</div>`;
 }
 
 function handleError(error, status) {
@@ -129,6 +146,8 @@ function callAdminCard(c) {
     <div class="chips">${statusChip(c)}</div>
     <div class="call-foot"><span><b>${c.counts[0]}</b> ${esc(answer(c, 0))} · <b>${c.counts[1]}</b> ${esc(answer(c, 1))}</span><button class="report" data-act="remove" data-id="${c.id}">Remove call</button></div>
     ${action}
+    <button class="link-btn" data-act="toggle-comments" data-id="${c.id}">${A.openComments.has(c.id) ? 'Hide' : 'Show'} comments (${c.comments})</button>
+    ${commentsHtml(c)}
   </article>`;
 }
 
@@ -296,6 +315,24 @@ document.addEventListener('click', e => {
       }
       break;
     }
+    case 'toggle-comments':
+      if (A.openComments.has(id)) A.openComments.delete(id);
+      else { A.openComments.add(id); fetchComments(id).then(() => { root.querySelector('#admin-lists').innerHTML = listsHtml(); }); }
+      root.querySelector('#admin-lists').innerHTML = listsHtml();
+      break;
+    case 'remove-comment':
+      if (confirm('Remove this comment? It disappears for everyone.')) {
+        b.disabled = true;
+        api.admin.removeComment(id, b.dataset.cid).then(({ data, error }) => {
+          if (error) { b.disabled = false; return toast(error); }
+          A.comments[id] = data.comments;
+          const call = A.data.calls.find(c => c.id === id);
+          if (call) call.comments = data.comments.length;
+          root.querySelector('#admin-lists').innerHTML = listsHtml();
+          toast('Comment removed');
+        });
+      }
+      break;
     case 'qr': showQr(); break;
     case 'qr-close': closeQr(); break;
   }

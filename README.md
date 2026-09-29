@@ -14,8 +14,8 @@ A free-to-play forecasting app for the King's E-Lab pilot. People make yes/no ca
 
 | Who | What they do |
 |---|---|
-| Everyone | Open bnoc.netlify.app (or scan the QR), type first name and @cam.ac.uk email, make calls |
-| Admin | Opens **bnoc.netlify.app/#/admin**, types the admin key, posts calls with a closing time, closes and settles them |
+| Everyone | Open bnoc.netlify.app (or scan the QR), type first name and @cam.ac.uk email, make calls, comment |
+| Admin | Opens **bnoc.netlify.app/#/admin**, types the admin key, posts calls (two answers each: Yes/No or custom labels) with a closing time, closes and settles them, removes comments or people |
 
 Scoring (worked out by the back end, never the browser):
 
@@ -24,6 +24,8 @@ Scoring (worked out by the back end, never the browser):
 | Hunch (60%) | +10 | 0 |
 | Fairly sure (75%) | +20 | −5 |
 | Certain (90%) | +30 | −15 |
+
+Every call has exactly two answers: Yes / No by default, or two labels the admin chooses (e.g. "Team A" / "Team B"). Members can comment on any call; comments show first names, are checked for banned topics, and can be deleted by their author or an admin.
 
 Rules the back end enforces: answers are locked once made; no answers after a call closes; a call can only be settled after it closes; only the admin key can post, close, settle or remove calls; suggestions about banned topics (relationships, health, appearance, grades) are refused.
 
@@ -53,4 +55,4 @@ Admins don't have special accounts: anyone who knows `ADMIN_KEY` can open `/#/ad
 
 ## Privacy
 
-The in-app privacy notice (Me → Privacy notice) explains what's collected. **Delete my account** (Me tab) removes the person's name, email, login sessions, calls and suggestions straight away.
+The in-app privacy notice (Me → Privacy notice) explains what's collected. **Delete my account** (Me tab) removes the person's name, email, login sessions, calls, suggestions and comments straight away.

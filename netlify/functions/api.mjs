@@ -17,6 +17,7 @@
 //   f/{callId}/{uid}           { pick, conf, at }       the answer itself; written once, never overwritten
 //   fx/{callId}/{uid}/{pick}/{conf}/{at}               the same answer as a key, so one list() counts everything
 //   suggestion/{id}            { id, q, uid, name, at }
+//   comment/{callId}/{at}.{uid}.{cid}  { cid, uid, pid, name, text, at }   comments on a call, oldest first
 import { getStore } from '@netlify/blobs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { CONF, isCamEmail, normaliseEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../../shared/rules.js';
@@ -58,7 +59,14 @@ async function keys(st, prefix) {
 
 async function loadWorld(st) {
   if (cached && Date.now() - cached.at < CACHE_MS) return cached.world;
-  const [callKeys, userKeys, fxKeys] = await Promise.all([keys(st, 'call/'), keys(st, 'user/'), keys(st, 'fx/')]);
+  const [callKeys, userKeys, fxKeys, commentKeys] = await Promise.all([
+    keys(st, 'call/'), keys(st, 'user/'), keys(st, 'fx/'), keys(st, 'comment/')
+  ]);
+  const commentCounts = new Map();
+  for (const k of commentKeys) {
+    const callId = k.split('/')[1];
+    commentCounts.set(callId, (commentCounts.get(callId) || 0) + 1);
+  }
   const [calls, users] = await Promise.all([
     Promise.all(callKeys.map(k => st.get(k, { type: 'json' }))),
     Promise.all(userKeys.map(k => st.get(k, { type: 'json' })))
@@ -73,7 +81,7 @@ async function loadWorld(st) {
     if (!prev || f.at < prev.at) first.set(`${callId}/${uid}`, f);
   }
   const forecasts = [...first.values()];
-  const world = { calls: calls.filter(Boolean), users: users.filter(Boolean), forecasts };
+  const world = { calls: calls.filter(Boolean), users: users.filter(Boolean), forecasts, commentCounts };
   cached = { at: Date.now(), world };
   return world;
 }
@@ -128,6 +136,7 @@ function tally(world, call) {
 
 const callSummary = (world, c) => ({
   id: c.id, q: c.q, options: optionsOf(c), closesAt: c.closesAt, status: statusOf(c), result: resultOf(c),
+  comments: world.commentCounts.get(c.id) || 0,
   ...tally(world, c)
 });
 
@@ -210,13 +219,15 @@ async function join(st, body) {
 async function deleteUser(st, me) {
   const mine = (await keys(st, 'fx/')).filter(k => k.split('/')[2] === me.id);
   const suggestions = await Promise.all((await keys(st, 'suggestion/')).map(k => st.get(k, { type: 'json' })));
+  const comments = (await keys(st, 'comment/')).filter(k => k.split('/')[2].split('.')[1] === me.id);
   const toDelete = [
     `user/${me.id}`,
     `email/${sha(me.email)}`,
     ...(me.sessions || []).map(h => `session/${h}`),
     ...mine,
     ...mine.map(k => `f/${k.split('/')[1]}/${me.id}`),
-    ...suggestions.filter(s => s && s.uid === me.id).map(s => `suggestion/${s.id}`)
+    ...suggestions.filter(s => s && s.uid === me.id).map(s => `suggestion/${s.id}`),
+    ...comments
   ];
   await Promise.all(toDelete.map(k => st.delete(k)));
   forget();
@@ -253,6 +264,55 @@ async function suggest(st, me, body) {
   const s = { id: newId(), q, uid: me.id, name: me.name, at: new Date().toISOString() };
   await st.setJSON(`suggestion/${s.id}`, s);
   return json(200, { ok: true });
+}
+
+// ---------- Comments ----------
+const COMMENT_MAX = 280;
+const COMMENT_GAP_MS = 5000;   // one comment every few seconds per person, to stop spam
+const commentKey = (callId, at, uid, cid) => `comment/${callId}/${String(at).padStart(13, '0')}.${uid}.${cid}`;
+
+// What phones see: never the internal uid, only the public pid (for the avatar colour).
+async function listComments(st, callId, viewer) {
+  const ks = await keys(st, `comment/${callId}/`);
+  const items = (await Promise.all(ks.map(k => st.get(k, { type: 'json' })))).filter(Boolean);
+  return items.sort((a, b) => a.at - b.at).map(c => ({
+    id: `${c.at}.${c.cid}`, pid: c.pid, name: c.name, text: c.text, at: new Date(c.at).toISOString(),
+    mine: !!viewer && c.uid === viewer.id
+  }));
+}
+
+async function findCommentKey(st, callId, commentId) {
+  const [at, cid] = String(commentId).split('.');
+  if (!/^\d+$/.test(at || '') || !cid) return null;
+  const ks = await keys(st, `comment/${callId}/${String(at).padStart(13, '0')}.`);
+  return ks.find(k => k.endsWith(`.${cid}`)) || null;
+}
+
+async function addComment(st, me, callId, body) {
+  const text = clean(body.text, COMMENT_MAX);
+  if (!text) return fail(400, 'Write something first.');
+  if (isBannedTopic(text)) return fail(422, "This comment can't be posted. BNOC doesn't allow comments about relationships, health, appearance or grades.");
+  const call = await st.get(`call/${callId}`, { type: 'json' });
+  if (!call || call.void) return fail(404, "That call isn't available any more.");
+  const now = Date.now();
+  const recent = (await keys(st, `comment/${callId}/`)).some(k => {
+    const [at, uid] = k.split('/')[2].split('.');
+    return uid === me.id && now - Number(at) < COMMENT_GAP_MS;
+  });
+  if (recent) return fail(429, 'Slow down a little: wait a few seconds between comments.');
+  const cid = newId();
+  await st.setJSON(commentKey(callId, now, me.id, cid), { cid, uid: me.id, pid: me.pid || me.id, name: me.name, text, at: now });
+  forget();
+  return json(200, { comments: await listComments(st, callId, me) });
+}
+
+async function removeComment(st, callId, commentId, me, admin) {
+  const key = await findCommentKey(st, callId, commentId);
+  if (!key) return fail(404, 'That comment has already gone.');
+  if (!admin && key.split('/')[2].split('.')[1] !== me?.id) return fail(403, 'You can only delete your own comments.');
+  await st.delete(key);
+  forget();
+  return json(200, { comments: await listComments(st, callId, me) });
 }
 
 // ---------- Admin ----------
@@ -360,6 +420,8 @@ export default async (req) => {
         await deleteUser(st, user);
         return adminState(st);
       }
+      if (route === 'GET admin/comments' && parts[2]) return json(200, { comments: await listComments(st, parts[2], null) });
+      if (route === 'POST admin/comments' && parts[2] && parts[3]) return removeComment(st, parts[2], parts[3], null, true);
       if (route === 'POST admin/suggestions' && parts[2]) {
         await st.delete(`suggestion/${parts[2]}`);
         return adminState(st);
@@ -375,6 +437,13 @@ export default async (req) => {
     if (route === 'POST forecast') return forecast(st, me, body);
     if (route === 'POST suggest') return suggest(st, me, body);
     if (route === 'POST delete-me') { await deleteUser(st, me); return json(200, { ok: true }); }
+    // Comments are for members only: /api/comments/{callId}, and /api/comments/{callId}/{commentId} to delete your own.
+    if (parts[0] === 'comments' && parts[1]) {
+      const [, callId, commentId] = parts;
+      if (req.method === 'GET' && !commentId) return json(200, { comments: await listComments(st, callId, me) });
+      if (req.method === 'POST' && !commentId) return addComment(st, me, callId, body);
+      if (req.method === 'POST' && commentId) return removeComment(st, callId, commentId, me, false);
+    }
     return fail(404, 'Not found.');
   } catch (err) {
     console.error(err);
