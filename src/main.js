@@ -1,7 +1,7 @@
 // BNOC pitch app: join, make calls, see the leaderboard. The admin page lives in admin.js (#/admin).
 import './styles.css';
 import { api, getToken, setToken } from './api.js';
-import { $, esc, ord, toast, openSheet, closeSheet, showError, clearError, avatar, fmtWhen } from './ui.js';
+import { $, esc, ord, toast, openSheet, closeSheet, showError, clearError, avatar, fmtWhen, capitalise } from './ui.js';
 import { CONF, COMMUNITY, isCamEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../shared/rules.js';
 import { renderAdmin, refreshAdmin } from './admin.js';
 
@@ -341,7 +341,7 @@ function renderMe() {
     }
     return `<li><span>Called ${esc(answer(c, c.mine.pick))} (${CONF[c.mine.conf].label.toLowerCase()}): ${esc(short)}</span><span>·</span></li>`;
   });
-  return `<h1 class="page-title">Me</h1>
+  return `<h1 class="page-title">${esc(capitalise(m.name))}</h1>
     <div class="balance"><div class="big">${s.score}</div><div class="lbl">season score · ${s.settled ? `${ord(s.rank)} of ${s.people}` : 'no results yet'} in ${esc(COMMUNITY.name)}</div>
       <div class="fine">Signed in as ${esc(m.name)} · ${esc(m.email)}</div></div>
     <h2 class="section-h">Activity</h2>

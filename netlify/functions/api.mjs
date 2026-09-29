@@ -194,7 +194,8 @@ function isAdmin(req) {
 
 // ---------- People ----------
 async function join(st, body) {
-  const name = clean(body.name, 30);
+  const raw = clean(body.name, 30);
+  const name = raw.charAt(0).toUpperCase() + raw.slice(1);   // "jacopo" → "Jacopo"
   const email = normaliseEmail(body.email);
   if (!name) return fail(400, 'Add your first name so people know who you are.');
   if (!isCamEmail(email)) return fail(400, CAM_ONLY_MSG);

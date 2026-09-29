@@ -11,6 +11,8 @@ export const colorOf = id => {
   for (const ch of String(id)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return COLORS[h % COLORS.length];
 };
+// "jacopo" → "Jacopo" (only the first letter changes, so "de Souza" → "De Souza").
+export const capitalise = s => { const t = String(s ?? ''); return t.charAt(0).toUpperCase() + t.slice(1); };
 export const initials = n => (String(n || '?').trim().slice(0, 1) || '?').toUpperCase();
 export const avatar = (id, name, extra = '') =>
   `<span class="avatar ${extra}" style="background:${colorOf(id)}" aria-hidden="true">${esc(initials(name))}</span>`;
