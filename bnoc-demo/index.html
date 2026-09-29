@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2D1B3D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>BNOC · Big Name On Campus (demo)</title>
+<meta name="description" content="BNOC demo: make calls on real life in your community, win free points, spend them at local businesses.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2216%22 fill=%22%23FF6B4A%22/%3E%3Ctext x=%2232%22 y=%2246%22 font-family=%22Arial Black,Arial%22 font-weight=%22900%22 font-size=%2238%22 text-anchor=%22middle%22 fill=%22white%22%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --plum:#2D1B3D; --plum-2:#40295A; --plum-soft:#EDE7F4;
+  --coral:#FF6B4A; --coral-dark:#D9482A; --mint:#7FD8BE; --mint-dark:#2E8E74;
+  --ink:#231530; --muted:#655C73; --line:#E3DCEC; --bg:#F6F3FA; --white:#FFFFFF;
+  --display:'Bricolage Grotesque', 'Trebuchet MS', sans-serif;
+  --body:'DM Sans', 'Helvetica Neue', Helvetica, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:var(--body);color:var(--ink);background:#E9E3F0;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--coral);outline-offset:2px;border-radius:8px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* Page layout */
+.stage{min-height:100%;display:grid;place-items:center;padding:32px 16px}
+.btn-ghost{background:transparent;border:1.5px solid var(--plum);color:var(--plum);border-radius:999px;padding:9px 16px;font-weight:700;font-size:14px}
+.btn-ghost:hover{background:var(--plum);color:#fff}
+
+/* Phone */
+.phone{width:390px;height:min(812px, calc(100vh - 64px));min-height:640px;border-radius:48px;background:var(--plum);padding:12px;box-shadow:0 30px 60px -20px rgba(45,27,61,.45)}
+.screen{position:relative;width:100%;height:100%;border-radius:38px;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+@media (max-width:600px){
+  html,body{overflow:hidden;overscroll-behavior:none;background:var(--bg)}
+  .stage{display:block;padding:0;min-height:0}
+  .phone{width:100%;height:100vh;height:100dvh;min-height:0;border-radius:0;padding:0;box-shadow:none}
+  .screen{border-radius:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+}
+
+/* App header */
+.top{padding:18px 18px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg)}
+.comm-btn{display:flex;align-items:center;gap:8px;background:var(--white);border:1px solid var(--line);border-radius:999px;padding:6px 12px 6px 6px;font-weight:700;font-size:14px;max-width:210px}
+.comm-btn .dot{width:28px;height:28px;border-radius:50%;background:var(--plum);color:#fff;display:grid;place-items:center;font-family:var(--display);font-size:13px;flex:none}
+.comm-btn .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pts-pill{display:flex;align-items:center;gap:6px;background:var(--plum);color:#fff;border:0;border-radius:999px;padding:8px 13px;font-weight:700;font-size:14px}
+.pts-pill svg{color:var(--mint)}
+.about-btn{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#fff;font-weight:800;font-family:var(--display)}
+.top-right{display:flex;align-items:center;gap:8px}
+
+.content{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:4px 16px calc(110px + env(safe-area-inset-bottom,0px));scroll-behavior:smooth}
+.page-title{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.8px;margin:8px 2px 4px;color:var(--plum)}
+.page-sub{color:var(--muted);font-size:14px;margin:0 2px 16px;line-height:1.45}
+
+/* Segmented control */
+.seg{display:flex;gap:6px;margin:0 0 14px;background:var(--plum-soft);padding:4px;border-radius:14px}
+.seg button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:10px;font-weight:700;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--plum);box-shadow:0 1px 2px rgba(45,27,61,.12)}
+
+/* Call cards */
+.call{background:var(--white);border-radius:22px;padding:16px;margin-bottom:12px;border:1px solid var(--line)}
+.call-meta{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.avatar{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:11px;color:#fff;flex:none}
+.call h3{font-family:var(--display);font-weight:700;font-size:19px;line-height:1.22;margin:0 0 12px;letter-spacing:-.3px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px}
+.chip{font-size:12px;font-weight:700;border-radius:999px;padding:4px 9px;background:var(--plum-soft);color:var(--plum)}
+.chip.ok{background:#DDF4EC;color:#1F6B55}
+.chip.wait{background:#FFE9E3;color:#A33A20}
+.chip.won{background:var(--mint);color:var(--plum)}
+.chip.lost{background:#EFEAF4;color:var(--muted)}
+.bar{height:34px;border-radius:12px;overflow:hidden;display:flex;font-weight:700;font-size:13px}
+.bar .y{background:var(--coral);color:#fff;display:flex;align-items:center;padding-left:12px;transition:width .5s ease}
+.bar .n{background:var(--plum);color:#fff;display:flex;align-items:center;justify-content:flex-end;padding-right:12px;flex:1}
+.call-foot{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-size:12.5px;color:var(--muted)}
+.vote{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.vote button{border:0;border-radius:14px;padding:12px;font-weight:800;font-size:15px;font-family:var(--display)}
+.vote .yes{background:#FFE4DC;color:var(--coral-dark)}
+.vote .yes:hover{background:var(--coral);color:#fff}
+.vote .no{background:var(--plum-soft);color:var(--plum)}
+.vote .no:hover{background:var(--plum);color:#fff}
+.my-stake{margin-top:12px;background:var(--bg);border-radius:12px;padding:10px 12px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.link-btn{background:none;border:0;color:var(--coral-dark);font-weight:700;padding:4px 0;font-size:13.5px}
+.settle-btn{width:100%;margin-top:12px;border:0;border-radius:14px;padding:12px;background:var(--plum);color:#fff;font-weight:700}
+.report{background:none;border:0;color:var(--muted);font-size:12px;padding:2px 4px}
+.report:hover{color:var(--coral-dark)}
+
+/* Challenges */
+.chal{border-radius:22px;padding:18px;margin-bottom:12px;color:#fff;position:relative;overflow:hidden}
+.chal .biz{display:flex;align-items:center;gap:10px;font-weight:700;font-size:13px;opacity:.95}
+.chal .biz .logo{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.chal h3{font-family:var(--display);font-size:22px;line-height:1.15;margin:12px 0 6px;letter-spacing:-.4px}
+.chal p{margin:0 0 14px;font-size:14px;line-height:1.45;opacity:.92}
+.chal .prize{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.16);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:700;margin-bottom:14px}
+.chal-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chal-actions button{border:0;border-radius:12px;padding:10px 14px;font-weight:700;font-size:14px;background:#fff;color:var(--plum)}
+.chal-actions .sub{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.6)}
+.progress{height:8px;background:rgba(255,255,255,.25);border-radius:99px;overflow:hidden;margin:4px 0 14px}
+.progress i{display:block;height:100%;background:#fff;border-radius:99px}
+.chal .fine{font-size:12px;opacity:.8;margin-top:10px}
+
+/* Ranks */
+.podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;margin:6px 0 16px}
+.pod{background:#fff;border:1px solid var(--line);border-radius:18px;text-align:center;padding:14px 6px}
+.pod .avatar{width:44px;height:44px;font-size:15px;margin:0 auto 8px}
+.pod .n{font-weight:700;font-size:14px}
+.pod .s{font-family:var(--display);font-weight:800;font-size:20px;color:var(--plum)}
+.pod.first{background:var(--plum);color:#fff;border-color:var(--plum);padding:20px 6px}
+.pod.first .s{color:var(--mint)}
+.pod .place{font-size:12px;color:var(--muted);font-weight:700}
+.pod.first .place{color:#D6CBE3}
+.row{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px 14px;margin-bottom:8px}
+.row .rank{width:22px;font-weight:800;color:var(--muted);font-family:var(--display)}
+.row .who{flex:1;font-weight:700}
+.row .sc{font-family:var(--display);font-weight:800;color:var(--plum)}
+.row.me{border:2px solid var(--coral)}
+.banner{background:var(--mint);color:var(--plum);border-radius:18px;padding:14px 16px;font-size:14px;line-height:1.4;margin-bottom:14px;display:flex;gap:12px;align-items:center}
+.banner b{font-weight:800}
+
+/* Wallet */
+.balance{background:var(--plum);color:#fff;border-radius:26px;padding:22px;margin:6px 0 14px}
+.balance .big{font-family:var(--display);font-weight:800;font-size:56px;letter-spacing:-2px;line-height:1}
+.balance .lbl{color:#D6CBE3;font-size:14px;margin-top:4px}
+.balance .refill{margin-top:16px;height:8px;background:rgba(255,255,255,.2);border-radius:99px;overflow:hidden}
+.balance .refill i{display:block;height:100%;background:var(--mint)}
+.balance .fine{font-size:12.5px;color:#D6CBE3;margin-top:8px}
+.rules{background:#fff;border:1px dashed #CDBFDD;border-radius:18px;padding:14px 16px;font-size:13.5px;line-height:1.5;color:var(--muted);margin-bottom:18px}
+.rules b{color:var(--ink)}
+.section-h{font-family:var(--display);font-weight:700;font-size:18px;margin:18px 2px 10px}
+.prize-card{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:8px}
+.prize-card .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.prize-card .t{flex:1}
+.prize-card .t b{display:block;font-size:15px}
+.prize-card .t span{font-size:12.5px;color:var(--muted)}
+.prize-card button{border:0;background:var(--coral);color:#fff;border-radius:12px;padding:9px 12px;font-weight:700;font-size:13px}
+.prize-card button[disabled]{background:var(--plum-soft);color:var(--muted);cursor:default}
+.log{list-style:none;margin:0;padding:0}
+.log li{display:flex;justify-content:space-between;gap:10px;padding:10px 2px;border-bottom:1px solid var(--line);font-size:14px}
+.log li span:last-child{font-weight:700;white-space:nowrap}
+.plus{color:var(--mint-dark)} .minus{color:var(--coral-dark)}
+
+/* Bottom nav */
+.nav{position:absolute;left:0;right:0;bottom:0;padding:10px 14px calc(14px + env(safe-area-inset-bottom,0px));background:rgba(246,243,250,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);align-items:center}
+.nav button{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;font-weight:700;color:var(--muted);padding:6px 0;border-radius:12px}
+.nav button[aria-current="page"]{color:var(--plum)}
+.nav button[aria-current="page"] svg{color:var(--coral)}
+.nav .fab{width:56px;height:56px;border-radius:18px;background:var(--coral);color:#fff;justify-self:center;margin-top:-26px;box-shadow:0 10px 20px -8px rgba(255,107,74,.8);display:grid;place-items:center;padding:0}
+.nav .fab:hover{background:var(--coral-dark)}
+
+/* Sheet + modal */
+.scrim{position:absolute;inset:0;background:rgba(35,21,48,.45);display:none;z-index:20}
+.scrim.open{display:block}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:#fff;border-radius:28px 28px 0 0;padding:10px 20px calc(24px + env(safe-area-inset-bottom,0px));z-index:21;transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);max-height:88%;overflow-y:auto}
+.sheet.open{transform:none}
+.grab{width:40px;height:5px;border-radius:9px;background:#DDD4E7;margin:0 auto 14px}
+.sheet h2{font-family:var(--display);font-weight:800;font-size:23px;letter-spacing:-.5px;margin:0 0 6px;line-height:1.2}
+.sheet p.lead{color:var(--muted);margin:0 0 16px;font-size:14px;line-height:1.45}
+.field{margin-bottom:14px}
+.field label{display:block;font-weight:700;font-size:14px;margin-bottom:6px}
+.field .hint{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.4}
+.field textarea,.field input[type=text],.field select{width:100%;border:1.5px solid var(--line);border-radius:14px;padding:12px;background:var(--bg);font-size:16px}
+.field textarea{resize:none;min-height:84px}
+.field textarea:focus,.field input:focus,.field select:focus{border-color:var(--plum);outline:none;background:#fff}
+.err{background:#FFE9E3;color:#8E2E17;border-radius:12px;padding:10px 12px;font-size:13.5px;line-height:1.4;margin-bottom:12px;display:none}
+.err.show{display:block}
+.primary{width:100%;border:0;border-radius:16px;padding:15px;background:var(--coral);color:#fff;font-weight:800;font-size:16px;font-family:var(--display)}
+.primary:hover{background:var(--coral-dark)}
+.primary.dark{background:var(--plum)} .primary.dark:hover{background:var(--plum-2)}
+.secondary{width:100%;border:0;border-radius:16px;padding:13px;background:var(--plum-soft);color:var(--plum);font-weight:700;margin-top:8px}
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.opt{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:9px 14px;font-weight:700;font-size:14px}
+.opt[aria-pressed="true"]{border-color:var(--plum);background:var(--plum);color:#fff}
+.stake-num{font-family:var(--display);font-weight:800;font-size:48px;text-align:center;letter-spacing:-1.5px;color:var(--plum);margin:6px 0 0}
+.stake-num small{font-size:16px;color:var(--muted);letter-spacing:0;font-family:var(--body)}
+input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
+.est{background:var(--bg);border-radius:14px;padding:12px;font-size:14px;margin:4px 0 16px;line-height:1.4}
+.side-tag{display:inline-block;border-radius:8px;padding:2px 8px;font-weight:800;color:#fff}
+.side-tag.y{background:var(--coral)} .side-tag.n{background:var(--plum)}
+.qr{display:grid;place-items:center;margin:8px 0 16px}
+.qr-box{position:relative;width:200px;height:200px;border-radius:20px;background:#fff;border:1.5px solid var(--line);padding:14px}
+.qr-box .scanline{position:absolute;left:12px;right:12px;height:3px;background:var(--coral);top:14px;border-radius:3px;animation:scan 1.6s ease-in-out infinite alternate}
+@keyframes scan{to{top:183px}}
+.code{font-family:var(--display);font-weight:800;font-size:34px;letter-spacing:3px;text-align:center;background:var(--plum-soft);color:var(--plum);border-radius:18px;padding:18px;margin:10px 0}
+.big-check{width:84px;height:84px;border-radius:50%;background:var(--mint);display:grid;place-items:center;margin:8px auto 14px;color:var(--plum)}
+.center{text-align:center}
+
+/* Toast */
+.toast{pointer-events:none;position:absolute;left:16px;right:16px;top:calc(14px + env(safe-area-inset-top,0px));background:var(--plum);color:#fff;border-radius:16px;padding:12px 14px;font-weight:600;font-size:14px;z-index:40;display:flex;gap:10px;align-items:center;transform:translateY(-140%);transition:transform .3s ease;box-shadow:0 10px 30px -10px rgba(35,21,48,.6)}
+.toast.show{transform:none}
+.toast .ti{width:26px;height:26px;border-radius:50%;background:var(--mint);color:var(--plum);display:grid;place-items:center;flex:none}
+
+/* Onboarding */
+.onboard{position:absolute;inset:0;background:var(--plum);color:#fff;z-index:30;display:flex;flex-direction:column;padding:calc(40px + env(safe-area-inset-top,0px)) 26px calc(28px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+.onboard.hide{display:none}
+.onboard .mark{font-family:var(--display);font-weight:800;font-size:76px;letter-spacing:-3px;line-height:.9;margin:20px 0 6px}
+.onboard .mark span{color:var(--coral)}
+.onboard .full{color:#CFC2DE;font-size:15px;margin:0 0 20px}
+.onboard .pitch{font-family:var(--display);font-size:25px;line-height:1.2;font-weight:700;margin:0 0 26px;color:var(--mint)}
+.onboard label{font-weight:700;font-size:14px;display:block;margin-bottom:8px}
+.onboard input{width:100%;border:0;border-radius:14px;padding:14px;font-size:16px;margin-bottom:18px;background:#fff;color:var(--ink)}
+.onboard .opts .opt{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.onboard .opts .opt[aria-pressed="true"]{background:#fff;color:var(--plum);border-color:#fff}
+.onboard .spacer{flex:1;min-height:22px}
+.onboard .small{font-size:12.5px;color:#CFC2DE;margin-top:12px;text-align:center;line-height:1.5}
+
+/* Business view */
+.biz-head{background:var(--plum);color:#fff;border-radius:24px;padding:18px;margin:6px 0 14px}
+.biz-head .n{font-family:var(--display);font-weight:800;font-size:24px}
+.biz-head .s{color:#D6CBE3;font-size:13.5px;margin-top:2px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px}
+.stat .v{font-family:var(--display);font-weight:800;font-size:30px;color:var(--plum);letter-spacing:-1px}
+.stat .l{font-size:13px;color:var(--muted)}
+.chart{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}
+.chart h4{margin:0 0 12px;font-size:14px}
+.bars{display:flex;gap:8px;align-items:flex-end;height:110px}
+.bars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.bars i{display:block;width:100%;background:var(--coral);border-radius:8px 8px 4px 4px}
+.bars span{font-size:11px;color:var(--muted);font-weight:700}
+.privacy{font-size:12.5px;color:var(--muted);background:var(--plum-soft);border-radius:14px;padding:10px 12px;line-height:1.45;margin-bottom:14px}
+.mode-switch{display:flex;background:var(--plum-soft);border-radius:999px;padding:3px;margin:0 16px 6px}
+.mode-switch button{flex:1;border:0;background:transparent;border-radius:999px;padding:7px;font-weight:700;font-size:12.5px;color:var(--muted)}
+.mode-switch button[aria-pressed="true"]{background:var(--plum);color:#fff}
+.empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.conf{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.conf button{border:1.5px solid var(--line);background:#fff;border-radius:14px;padding:12px 6px;text-align:center}
+.conf button b{display:block;font-family:var(--display);font-size:15px}
+.conf button span{font-size:12px;color:var(--muted)}
+.conf button[aria-pressed="true"]{border-color:var(--plum);background:var(--plum);color:#fff}
+.conf button[aria-pressed="true"] span{color:#D6CBE3}
+.event-box{margin-top:12px;background:#E6F7F1;border-radius:14px;padding:11px 12px;font-size:13.5px;line-height:1.4;color:#1F5A48;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.event-box button{border:0;background:var(--mint-dark);color:#fff;border-radius:10px;padding:8px 11px;font-weight:700;font-size:13px;white-space:nowrap}
+.event-box .done{font-weight:800}
+.host{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px 12px;margin-bottom:14px;font-size:13.5px;line-height:1.35;color:var(--muted)}
+.host b{color:var(--ink)}
+.chip.auto{background:#E4ECFB;color:#284A8C}
+.chip.event{background:#DDF4EC;color:#1F6B55}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4;margin-bottom:10px;font-weight:400!important}
+.check input{width:20px;height:20px;accent-color:var(--plum);margin-top:1px;flex:none}
+.score-table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0}
+.score-table th,.score-table td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line)}
+.score-table th{color:var(--muted);font-weight:700;font-size:12px}
+.reveal-rank{font-family:var(--display);font-weight:800;font-size:64px;text-align:center;color:var(--coral);line-height:1;margin:6px 0}
+.recap{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
+.recap div{background:var(--bg);border-radius:14px;padding:10px;text-align:center}
+.recap b{display:block;font-family:var(--display);font-size:22px;color:var(--plum)}
+.recap span{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<main class="stage">
+
+  <div class="phone">
+    <div class="screen" id="screen">
+      <div class="toast" id="toast" role="status" aria-live="polite"><span class="ti" aria-hidden="true">✓</span><span id="toast-text"></span></div>
+
+      <div class="onboard" id="onboard">
+        <p class="mark">BN<span>O</span>C</p>
+        <p class="full">Big Name On Campus</p>
+        <p class="pitch">Call what happens around you. Show up. Win prizes from local places.</p>
+        <label for="ob-name">Your first name</label>
+        <input id="ob-name" type="text" maxlength="20" placeholder="e.g. Araha" autocomplete="given-name">
+        <label id="ob-comm-l">Your college or city</label>
+        <div class="opts" role="group" aria-labelledby="ob-comm-l" id="ob-comms"></div>
+        <div class="spacer"></div>
+        <button class="primary" data-act="join">Join BNOC</button>
+        <p class="small">18+ only. Free to play: no money, nothing to buy, nothing to cash out.</p>
+      </div>
+
+      <header class="top">
+        <button class="comm-btn" data-act="switch-comm" aria-label="Switch community"><span class="dot" id="comm-dot">RT</span><span class="name" id="comm-name">Rugby team</span></button>
+        <div class="top-right">
+          <button class="pts-pill" data-act="go-wallet" aria-label="Your season score"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg><span id="pts">410</span></button>
+          <button class="about-btn" data-act="about" aria-label="About this demo">?</button>
+        </div>
+      </header>
+      <div class="mode-switch" role="group" aria-label="View">
+        <button data-act="mode" data-mode="member" aria-pressed="true">Member app</button>
+        <button data-act="mode" data-mode="business" aria-pressed="false">Business view</button>
+      </div>
+
+      <div class="content" id="content" tabindex="-1"></div>
+
+      <nav class="nav" id="nav" aria-label="Main">
+        <button data-act="tab" data-tab="calls" aria-current="page"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Calls</button>
+        <button data-act="tab" data-tab="local"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>Local</button>
+        <button class="fab" data-act="new-call" aria-label="Make a call"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button data-act="tab" data-tab="ranks"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Ranks</button>
+        <button data-act="tab" data-tab="wallet"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8c-2-4-6-4-6-1.5S10 8 12 8zm0 0c2-4 6-4 6-1.5S14 8 12 8z"/></svg>Rewards</button>
+      </nav>
+
+      <div class="scrim" id="scrim" data-act="close"></div>
+      <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+'use strict';
+
+// ---------- Rules ----------
+// Forecasting, not staking: you never put points in. Being right earns points, scaled by confidence.
+const CONF = {
+  hunch:   {label:'Hunch',       pct:'60%', win:10, lose:0},
+  sure:    {label:'Fairly sure', pct:'75%', win:20, lose:5},
+  certain: {label:'Certain',     pct:'90%', win:30, lose:15}
+};
+const CHECKIN_PTS = 10;   // for turning up to an event call
+const BIZ_PTS = 15;       // for checking in at a local business
+
+// ---------- Sample data ----------
+// Official communities: run by BNOC, fed by calendars, fixtures, listings and the BNOC team.
+const OFFICIAL = [
+  {id:'college', type:'official', name:'Trinity College', short:'TC', members:1240, src:'the college calendar, fixtures and the BNOC team'},
+  {id:'cambridge', type:'official', name:'Cambridge', short:'CB', members:8600, src:'local listings, the weather and the BNOC team'}
+];
+const COLORS = ['#FF6B4A','#2D1B3D','#2E8E74','#8A4FBF','#D9482A','#4B6CB7','#B5487A'];
+const BANNED = ['break up','breakup','broke up','dating','date with','hook up','hookup','kiss','crush','sleep with','weight','fat','ugly','looks','grade','marks','exam result','fail','pregnan','sick','illness','drunk','cheat','divorce','therapy','depress'];
+
+function seed(){
+  return {
+    joined:false, me:'', comm:'rugby', tab:'calls', mode:'member', filter:'open',
+    score:410,
+    members:[
+      {id:'joe', name:'Joe', score:720},
+      {id:'utsav', name:'Utsav', score:540},
+      {id:'mark', name:'Mark', score:470},
+      {id:'alexander', name:'Alexander', score:365},
+      {id:'jacopo', name:'Jacopo', score:300},
+      {id:'priya', name:'Priya', score:810, stranger:true},
+      {id:'tom', name:'Tom', score:765, stranger:true},
+      {id:'hannah', name:'Hannah', score:690, stranger:true},
+      {id:'oliver', name:'Oliver', score:610, stranger:true},
+      {id:'grace', name:'Grace', score:455, stranger:true},
+      {id:'sam', name:'Sam', score:390, stranger:true}
+    ],
+    // Private groups: made by users, sit inside an official community and get all its calls automatically.
+    groups:[
+      {id:'rugby', type:'group', name:'Rugby team', short:'RT', parent:'college', admin:'joe', people:['joe','utsav','mark']},
+      {id:'elab', type:'group', name:"King's E-Lab", short:'KE', parent:'cambridge', admin:'jacopo', people:['joe','utsav','mark','alexander','jacopo']}
+    ],
+    calls:[
+      // Trinity College (official)
+      {id:'c2', comm:'college', q:'Will more than 150 people come to the college bop on Saturday?', by:'auto', src:'From the college calendar', yes:134, no:81, closes:'Sat, 9pm', status:'open', event:{venue:'the college bar', when:'Sat 9pm'}},
+      {id:'r1', comm:'college', q:"Will Trinity beat St John's at rugby on Saturday?", by:'auto', src:'From the fixture list · settles automatically', yes:148, no:62, closes:'Sat, 2pm', status:'open', event:{venue:'the match', when:'Sat 2pm'}},
+      {id:'c6', comm:'college', q:'Will formal hall serve sticky toffee pudding this Friday?', by:'auto', src:'BNOC team', yes:90, no:42, closes:'Fri, 5pm', status:'open'},
+      {id:'c7', comm:'college', q:'Will more than 200 people vote in the JCR election?', by:'auto', src:'From the college calendar', yes:58, no:96, closes:'Wed, 8pm', status:'open'},
+      // Cambridge (official)
+      {id:'c3', comm:'cambridge', q:'Will more than 50 people turn up to Thursday open mic at The Anchor?', by:'auto', src:'From local listings', yes:121, no:113, closes:'Thu, 7pm', status:'open', tag:'The Anchor challenge', event:{venue:'The Anchor', when:'Thu 7pm'}},
+      {id:'e1', comm:'cambridge', q:'Will more than 30 teams pitch at the E-Lab showcase?', by:'auto', src:'From the E-Lab events list', yes:86, no:44, closes:'Mon, 5pm', status:'open'},
+      {id:'c10', comm:'cambridge', q:'Will it rain on Saturday morning?', by:'auto', src:'From the Met Office forecast · settles automatically', yes:208, no:230, closes:'Fri, 11pm', status:'open'},
+      {id:'c8', comm:'cambridge', q:'Will the new café on Mill Road open by Friday?', by:'auto', src:'BNOC team', yes:52, no:130, closes:'Fri, 9am', status:'open'},
+      // Rugby team (private group in Trinity)
+      {id:'g1', comm:'rugby', q:'Will Joe make all his 9am lectures this week?', by:'utsav', about:'joe', consent:'accepted', yes:2, no:1, closes:'Fri, 6pm', status:'open'},
+      {id:'g2', comm:'rugby', q:'Will Utsav make every 7am training session this week?', by:'mark', about:'utsav', consent:'accepted', yes:1, no:2, closes:'Sun, 8pm', status:'open'},
+      {id:'c4', comm:'rugby', q:'Will it snow in Cambridge before 1 December?', by:'me', yes:1, no:3, closes:'Closed', status:'closed', mine:{side:'no', conf:'sure'}},
+      // King's E-Lab (private group in Cambridge)
+      {id:'e2', comm:'elab', q:'Will the E-Lab social on Thursday fill the room?', by:'jacopo', yes:3, no:2, closes:'Thu, 6pm', status:'open', event:{venue:'the E-Lab social', when:'Thu 6pm'}},
+      {id:'e4', comm:'elab', q:"Will our BNOC demo be live on Netlify before Friday's pitch?", by:'jacopo', yes:4, no:1, closes:'Fri, 9am', status:'open'},
+      {id:'e3', comm:'elab', q:'Will it snow in Cambridge before 1 December?', by:'me', yes:1, no:4, closes:'Closed', status:'closed', mine:{side:'no', conf:'sure'}},
+      {id:'c5', comm:'elab', q:'Will Alexander finish the Cambridge half marathon in under 2 hours?', by:'mark', about:'alexander', consent:'accepted', yes:4, no:1, closes:'Settled', status:'resolved', result:'yes', mine:{side:'yes', conf:'sure', pts:20}}
+    ],
+    challenges:[
+      {id:'jacks', biz:"Jack's Gelato", title:"Jack's Gelato Challenge", body:`The top caller in Cambridge this week wins a free gelato. Check in at the shop for ${BIZ_PTS} bonus points.`, prize:'Free gelato, any size', ends:'Ends Sunday', color:'#FF6B4A', type:'top', checkedIn:false, joined:38, icon:'gelato'},
+      {id:'bean', biz:'Bean & Leaf', title:'Three visits, one free flat white', body:'Check in on three different days and your next flat white is on us.', prize:'Free flat white', ends:'Ends in 12 days', color:'#2E8E74', type:'visits', need:3, have:1, checkedIn:false, joined:57, icon:'cup'},
+      {id:'anchor', biz:'The Anchor', title:'Call the open mic turnout', body:"Call Thursday's turnout right and check in on the night: everyone who does gets a free soft drink or half pint.", prize:'Free drink', ends:'Ends Thursday', color:'#2D1B3D', type:'call', callId:'c3', checkedIn:false, joined:24, icon:'mic'}
+    ],
+    prizes:[
+      {id:'p1', biz:'Mill Road Books', what:'£5 off any book', code:'BNOC-M4RB', exp:'Valid until 31 Oct', used:false, color:'#8A4FBF'}
+    ],
+    log:[
+      {t:'Right: Alexander half marathon (fairly sure)', v:'+20', k:'plus'},
+      {t:'Turned up: the E-Lab social', v:'+10', k:'plus'},
+      {t:'Checked in at Bean & Leaf', v:'+15', k:'plus'}
+    ],
+    week:{right:4, calls:7, places:2},
+    biz:{name:"Jack's Gelato", reach:8600, checkins:64, newVisitors:41, repeat:22, redeemed:3, week:[6,9,7,12,8,14,8], challenges:[{title:"Jack's Gelato Challenge", prize:'Free gelato, any size', ends:'Sunday'}]}
+  };
+}
+let S = seed();
+
+// ---------- Helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nameOf = id => id==='me' ? (S.me || 'You') : id==='auto' ? 'BNOC' : (S.members.find(m=>m.id===id)||{name:id}).name;
+const colorOf = id => { if(id==='me') return '#FF6B4A'; if(id==='auto') return '#4B6CB7'; const i = S.members.findIndex(m=>m.id===id); return COLORS[(i+1)%COLORS.length]; };
+const initials = n => n.trim().slice(0,1).toUpperCase();
+const avatar = (id, extra='') => `<span class="avatar ${extra}" style="background:${colorOf(id)}" aria-hidden="true">${esc(initials(nameOf(id)))}</span>`;
+const pct = c => { const t=c.yes+c.no; return t? Math.round(c.yes/t*100) : 50; };
+const spaceById = id => OFFICIAL.find(c=>c.id===id) || S.groups.find(g=>g.id===id);
+const comm = () => spaceById(S.comm);
+const parentOf = sp => sp.type==='group' ? spaceById(sp.parent) : sp;
+// A group sees its parent's official calls plus its own. An official community sees only official calls.
+const callsIn = sp => S.calls.filter(c => c.comm===sp.id || (sp.type==='group' && c.comm===sp.parent)).sort((x,y)=>(x.comm===sp.id?0:1)-(y.comm===sp.id?0:1));
+const peopleIn = sp => sp.type==='group' ? sp.people : S.members.map(m=>m.id);
+const ord = n => n + (n%10===1&&n!==11?'st':n%10===2&&n!==12?'nd':n%10===3&&n!==13?'rd':'th');
+const sideLabel = s => s==='yes'?'Yes':'No';
+
+let toastTimer;
+function toast(msg){
+  $('#toast-text').textContent = msg;
+  const t = $('#toast'); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), 2800);
+}
+function addLog(t, v, k){ S.log.unshift({t, v, k}); }
+function addScore(n){ S.score = Math.max(0, S.score + n); }
+
+// ---------- Rendering ----------
+function render(){
+  $('#pts').textContent = S.score;
+  $('#comm-name').textContent = comm().name;
+  $('#comm-dot').textContent = comm().short;
+  document.querySelectorAll('.mode-switch button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===S.mode)));
+  $('#nav').style.display = S.mode==='member' ? '' : 'none';
+  document.querySelectorAll('#nav [data-tab]').forEach(b=>{ if(b.dataset.tab===S.tab) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current'); });
+  const c = $('#content');
+  if(S.mode==='business'){ c.innerHTML = renderBusiness(); return; }
+  c.innerHTML = ({calls:renderCalls, local:renderLocal, ranks:renderRanks, wallet:renderRewards})[S.tab]();
+}
+
+function callCard(c){
+  const p = pct(c), total = c.yes + c.no, sp = comm(), admin = sp.type==='group' ? sp.admin : null, grp = spaceById(c.comm);
+  let chips = '';
+  if(c.src) chips += `<span class="chip auto">${esc(c.src)}</span>`;
+  if(grp && grp.type==='group') chips += `<span class="chip">Only in ${esc(grp.name)}</span>`;
+  if(c.event) chips += `<span class="chip event">Show-up bonus</span>`;
+  if(c.about){
+    chips += c.consent==='accepted'
+      ? `<span class="chip ok">${esc(nameOf(c.about))} accepted this call</span>`
+      : `<span class="chip wait">Waiting for ${esc(nameOf(c.about))} to accept</span>`;
+  }
+  if(c.tag) chips += `<span class="chip">${esc(c.tag)}</span>`;
+  if(c.status==='review') chips += `<span class="chip wait">Waiting for BNOC review</span>`;
+  if(c.status==='resolved'){
+    chips += `<span class="chip">Result: ${sideLabel(c.result)}</span>`;
+    if(c.mine) chips += c.mine.pts>0 ? `<span class="chip won">You called it: +${c.mine.pts}</span>` : `<span class="chip lost">Missed: ${c.mine.pts===0?'no points':c.mine.pts}</span>`;
+  }
+  const live = c.status==='open' && (!c.about || c.consent==='accepted');
+  let action = '';
+  if(c.status==='open' && c.about && c.consent!=='accepted'){
+    action = `<div class="my-stake"><span>Goes live once ${esc(nameOf(c.about))} says yes. They can decline at any time.</span></div>`;
+  } else if(live && !c.mine){
+    action = `<div class="vote"><button class="yes" data-act="call" data-id="${c.id}" data-side="yes">Yes</button><button class="no" data-act="call" data-id="${c.id}" data-side="no">No</button></div>`;
+  } else if(c.mine && c.status!=='resolved'){
+    const cf = CONF[c.mine.conf];
+    action = `<div class="my-stake"><span>You called <span class="side-tag ${c.mine.side==='yes'?'y':'n'}">${sideLabel(c.mine.side)}</span> · ${cf.label}</span><span>+${cf.win}${c.event?' (×2)':''}</span></div>`;
+  }
+  if(c.event && c.status!=='resolved'){
+    if(c.mine && c.mine.checkedIn) action += `<div class="event-box"><span>You're at ${esc(c.event.venue)}. Your points will be doubled if you're right.</span><span class="done" aria-hidden="true">✓</span></div>`;
+    else if(c.mine) action += `<div class="event-box"><span>Turn up to ${esc(c.event.venue)} (${esc(c.event.when)}) and check in to double your points.</span><button data-act="event-checkin" data-id="${c.id}">Check in</button></div>`;
+    else action += `<div class="event-box"><span>Make your call, then check in at ${esc(c.event.venue)} to double your points.</span></div>`;
+  }
+  if(c.by==='me' && c.status!=='resolved' && (!c.about || c.consent==='accepted')){
+    action += `<button class="settle-btn" data-act="settle" data-id="${c.id}">Settle this call</button>`;
+  }
+  if(c.by==='auto' && c.status!=='resolved' && c.mine){
+    action += `<button class="settle-btn" data-act="settle" data-id="${c.id}">Demo: fast-forward to the result</button>`;
+  }
+  const who = c.by==='auto' ? `<span><b>BNOC</b> · ${esc(grp.name)}</span>` : `<span><b>${esc(nameOf(c.by))}</b>${c.by===admin?' (admin)':''} made a call</span>`;
+  return `<article class="call">
+    <div class="call-meta">${avatar(c.by)}${who}</div>
+    <h3>${esc(c.q)}</h3>
+    ${chips?`<div class="chips">${chips}</div>`:''}
+    <div class="bar" role="img" aria-label="The crowd says ${p}% Yes"><div class="y" style="width:${Math.max(p,14)}%">Yes ${p}%</div><div class="n">No ${100-p}%</div></div>
+    <div class="call-foot"><span>${total} people called it · ${esc(c.closes)}</span><button class="report" data-act="report" data-id="${c.id}">Report</button></div>
+    ${action}
+  </article>`;
+}
+
+function spaceBox(cm){
+  if(cm.type==='group'){
+    const par = parentOf(cm);
+    return `<div class="host"><span class="avatar" style="background:var(--coral)" aria-hidden="true">${esc(cm.short)}</span><span><b>Private group · ${cm.people.length+1} people.</b> You get every ${esc(par.name)} call automatically, plus your group's own. Admin: ${esc(nameOf(cm.admin))}.</span></div>`;
+  }
+  return `<div class="host"><span class="avatar" style="background:var(--plum)" aria-hidden="true">${esc(cm.short)}</span><span><b>Official community · ${cm.members.toLocaleString()} people.</b> Run by BNOC, with new calls every day from ${esc(cm.src)}.</span></div>`;
+}
+
+function renderCalls(){
+  const cm = comm();
+  const list = callsIn(cm);
+  const shown = S.filter==='open' ? list.filter(c=>c.status!=='resolved') : S.filter==='mine' ? list.filter(c=>c.mine||c.by==='me') : list.filter(c=>c.status==='resolved');
+  const f = (k,l)=>`<button data-act="filter" data-f="${k}" aria-pressed="${S.filter===k}">${l}</button>`;
+  return `<h1 class="page-title">Calls</h1>
+    <p class="page-sub">What's going to happen in ${esc(cm.name)}? Call it, then show up.</p>
+    ${spaceBox(cm)}
+    <div class="seg" role="group" aria-label="Filter calls">${f('open','Live')}${f('mine','Yours')}${f('resolved','Settled')}</div>
+    ${shown.length? shown.map(callCard).join('') : `<div class="empty">Nothing here yet. Tap + to make the first call.</div>`}`;
+}
+
+const ICONS = {
+  gelato:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11a5 5 0 0 1 10 0"/><path d="M6 11h12l-6 11z"/></svg>',
+  cup:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6z"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 2v3M12 2v3"/></svg>',
+  mic:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  star:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>'
+};
+
+function renderLocal(){
+  return `<h1 class="page-title">Local</h1>
+    <p class="page-sub">Challenges from places near you. They fund the prizes; you just show up.</p>
+    ${S.challenges.map(ch=>{
+      let mid='', btns='';
+      if(ch.type==='visits'){
+        mid = `<div class="progress" aria-label="${ch.have} of ${ch.need} visits"><i style="width:${ch.have/ch.need*100}%"></i></div><p style="margin-top:-6px">${ch.have} of ${ch.need} visits</p>`;
+      }
+      if(ch.type==='call'){
+        btns = `<button data-act="goto-call" data-id="${ch.callId}">Make the call</button>`;
+      } else {
+        btns = ch.checkedIn ? `<button disabled>Checked in today</button>` : `<button data-act="checkin" data-id="${ch.id}">Check in</button>`;
+        if(ch.type==='top') btns += `<button class="sub" data-act="tab" data-tab="ranks">See leaderboard</button>`;
+      }
+      return `<article class="chal" style="background:${ch.color}">
+        <div class="biz"><span class="logo">${ICONS[ch.icon]||ICONS.star}</span>${esc(ch.biz)}</div>
+        <h3>${esc(ch.title)}</h3>
+        <p>${esc(ch.body)}</p>
+        <span class="prize">${ICONS.star} ${esc(ch.prize)}</span>
+        ${mid}
+        <div class="chal-actions">${btns}</div>
+        <div class="fine">${esc(ch.ends)} · ${ch.joined} people taking part</div>
+      </article>`;
+    }).join('')}`;
+}
+
+function board(){
+  const ids = peopleIn(comm());
+  const all = S.members.filter(m=>ids.includes(m.id)).map(m=>({id:m.id, name:m.name, score:m.score})).concat([{id:'me', name:S.me||'You', score:S.score}]);
+  return all.sort((a,b)=>b.score-a.score);
+}
+function myRank(){ return board().findIndex(x=>x.id==='me')+1; }
+function renderRanks(){
+  const b = board(), r = myRank();
+  const pod = (x,i,cls)=> x? `<div class="pod ${cls}">${avatar(x.id)}<div class="n">${esc(x.id==='me'?'You':x.name)}</div><div class="s">${x.score}</div><div class="place">${ord(i)}</div></div>` : '';
+  return `<h1 class="page-title">Ranks</h1>
+    <p class="page-sub">This season in ${esc(comm().name)}. Season 1 ends in 23 days.</p>
+    <div class="banner"><span aria-hidden="true">${ICONS.star}</span><span>${comm().type==='group' ? `<b>Your group's table.</b> Same calls as ${esc(parentOf(comm()).name)}, ranked just among you. Sunday reveal at 8pm. You're ${ord(r)}.` : `<b>Sunday reveal, 8pm.</b> ${comm().id==='cambridge' ? "Jack's Gelato's prize goes to #1." : 'Weekly winners announced.'} You're ${ord(r)} of ${comm().members.toLocaleString()}.`}</span></div>
+    <div class="podium">${pod(b[1],2,'')}${pod(b[0],1,'first')}${pod(b[2],3,'')}</div>
+    ${b.slice(3, 10).map((x,i)=>`<div class="row ${x.id==='me'?'me':''}"><span class="rank">${i+4}</span>${avatar(x.id)}<span class="who">${esc(x.id==='me'?(S.me||'You')+' (you)':x.name)}</span><span class="sc">${x.score}</span></div>`).join('')}
+    <button class="primary dark" style="margin-top:10px" data-act="reveal">Preview Sunday's reveal</button>`;
+}
+
+function renderRewards(){
+  const r = myRank();
+  return `<h1 class="page-title">Rewards</h1>
+    <div class="balance"><div class="big">${S.score}</div><div class="lbl">season score · ${ord(r)} in ${esc(comm().name)}</div>
+      <div class="fine">Score goes up when you call things right, turn up to events and visit local places.</div></div>
+    <div class="rules"><b>How scoring works.</b> You never spend or lose points you've put in, because you don't put any in. Pick Yes or No and how sure you are:
+      <table class="score-table"><thead><tr><th>Confidence</th><th>Right</th><th>Wrong</th></tr></thead><tbody>
+      ${Object.values(CONF).map(c=>`<tr><td>${c.label} (${c.pct})</td><td class="plus">+${c.win}</td><td class="minus">${c.lose?'−'+c.lose:'0'}</td></tr>`).join('')}
+      </tbody></table>
+      Honest confidence scores best over a season. <b>Event calls:</b> check in on the day and right calls score double, plus ${CHECKIN_PTS} for turning up. Points can't be bought, sold or cashed out.</div>
+    <h2 class="section-h">Your prizes</h2>
+    ${S.prizes.length? S.prizes.map(p=>`<div class="prize-card"><span class="ic" style="background:${p.color};color:#fff">${ICONS.star}</span><span class="t"><b>${esc(p.what)}</b><span>${esc(p.biz)} · ${esc(p.exp)}</span></span>${p.used?'<button disabled>Used</button>':`<button data-act="show-code" data-id="${p.id}">Show code</button>`}</div>`).join('') : '<div class="empty">No prizes yet. Win a local challenge to earn one.</div>'}
+    <h2 class="section-h">Activity</h2>
+    <ul class="log">${S.log.slice(0,8).map(l=>`<li><span>${esc(l.t)}</span><span class="${l.k}">${esc(l.v)}</span></li>`).join('')}</ul>`;
+}
+
+function renderBusiness(){
+  const b = S.biz, max = Math.max(...b.week), days=['M','T','W','T','F','S','S'];
+  return `<div class="biz-head"><div class="n">${esc(b.name)}</div><div class="s">Your challenge reaches Cambridge's ${b.reach.toLocaleString()} members and every private group built on it · sample data</div></div>
+    <div class="stats">
+      <div class="stat"><div class="v">${b.checkins}</div><div class="l">Check-ins</div></div>
+      <div class="stat"><div class="v">${b.newVisitors}</div><div class="l">First-time visitors</div></div>
+      <div class="stat"><div class="v">${b.repeat}</div><div class="l">Repeat visits</div></div>
+      <div class="stat"><div class="v">${b.redeemed}</div><div class="l">Prizes redeemed</div></div>
+    </div>
+    <div class="chart"><h4>Check-ins by day</h4><div class="bars">${b.week.map((v,i)=>`<div><i style="height:${Math.round(v/max*100)}%" title="${v}"></i><span>${days[i]}</span></div>`).join('')}</div></div>
+    <div class="privacy">You only see totals for your own challenges. BNOC never shares individual profiles or sells personal data.</div>
+    <h2 class="section-h">Your challenges</h2>
+    ${b.challenges.map(c=>`<div class="prize-card"><span class="ic" style="background:var(--coral);color:#fff">${ICONS.gelato}</span><span class="t"><b>${esc(c.title)}</b><span>${esc(c.prize)} · ends ${esc(c.ends)}</span></span></div>`).join('')}
+    <button class="primary dark" style="margin-top:8px" data-act="new-challenge">Create a challenge</button>
+    <p class="page-sub" style="margin-top:12px">During the pilot, challenges are free for businesses.</p>`;
+}
+
+// ---------- Sheets ----------
+function openSheet(html){
+  const sh = $('#sheet');
+  sh.innerHTML = `<div class="grab" aria-hidden="true"></div>${html}`;
+  $('#scrim').classList.add('open'); sh.classList.add('open');
+  const f = sh.querySelector('textarea, input, button:not([data-act="close"])'); if(f) setTimeout(()=>f.focus(), 250);
+}
+function closeSheet(){ $('#scrim').classList.remove('open'); $('#sheet').classList.remove('open'); }
+const checkSvg = '<div class="big-check" aria-hidden="true"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></div>';
+
+let callCtx = null;
+function openCall(id, side){
+  const c = S.calls.find(x=>x.id===id);
+  callCtx = {id, side, conf:'sure'};
+  openSheet(`<h2 id="sheet-title">${esc(c.q)}</h2>
+    <p class="lead">You're calling <span class="side-tag ${side==='yes'?'y':'n'}">${sideLabel(side)}</span>. How sure are you?</p>
+    <div class="conf" role="group" aria-label="Confidence">${Object.entries(CONF).map(([k,v])=>`<button data-act="conf" data-k="${k}" aria-pressed="${k==='sure'}"><b>${v.label}</b><span>${v.pct}</span></button>`).join('')}</div>
+    <div class="est" id="call-est"></div>
+    <button class="primary" data-act="confirm-call">Call ${sideLabel(side)}</button>
+    <button class="secondary" data-act="close">Cancel</button>`);
+  updateEst();
+}
+function updateEst(){
+  const c = S.calls.find(x=>x.id===callCtx.id), cf = CONF[callCtx.conf];
+  let t = `Right: <b>+${cf.win}</b>${c.event?` (or <b>+${cf.win*2}</b> if you check in at ${esc(c.event.venue)})`:''}. Wrong: <b>${cf.lose?'−'+cf.lose:'no change'}</b>. You aren't spending anything.`;
+  $('#call-est').innerHTML = t;
+}
+function confirmCall(){
+  const c = S.calls.find(x=>x.id===callCtx.id);
+  c[callCtx.side] += 1; c.mine = {side:callCtx.side, conf:callCtx.conf};
+  S.week.calls++;
+  addLog(`Called ${sideLabel(callCtx.side)} (${CONF[callCtx.conf].label.toLowerCase()}): ${c.q.slice(0,28)}…`, '·', 'plus');
+  closeSheet(); render();
+  toast(c.event ? `Called it. Check in at ${c.event.venue} to double your points.` : `Called ${sideLabel(callCtx.side)}, ${CONF[callCtx.conf].label.toLowerCase()}`);
+}
+
+let newAbout = '';
+function openNewCall(){
+  newAbout = '';
+  const sp = comm(), official = sp.type!=='group';
+  openSheet(`<h2 id="sheet-title">${official?'Suggest a call':'Make a call'}</h2>
+    <p class="lead">${official ? `Suggest a yes/no question for everyone in ${esc(sp.name)}. BNOC checks suggestions before they go live. Calls about friends belong in a private group.` : `Ask your group a yes/no question. It goes live straight away, and ${esc(sp.name)} members see it alongside the ${esc(parentOf(sp).name)} calls.`}</p>
+    <div class="err" id="nc-err" role="alert"></div>
+    <div class="field"><label for="nc-q">Your question</label><textarea id="nc-q" maxlength="120" placeholder="Will 40 people come to Friday's society social?"></textarea>
+      <div class="hint">Not allowed: relationships, health, appearance or grades.</div></div>
+    ${official ? '' : `<div class="field"><label id="nc-about-l">Is it about someone in the group?</label>
+      <div class="opts" role="group" aria-labelledby="nc-about-l"><button class="opt" data-act="about-pick" data-id="" aria-pressed="true">No one</button>${sp.people.map(id=>`<button class="opt" data-act="about-pick" data-id="${id}" aria-pressed="false">${esc(nameOf(id))}</button>`).join('')}</div>
+      <div class="hint">If you name someone, they have to accept before the call goes live.</div></div>`}
+    <div class="field"><label class="check"><input type="checkbox" id="nc-event"><span><b>It's an event people can go to.</b> Anyone who checks in there gets double points.</span></label>
+      <input type="text" id="nc-venue" maxlength="40" placeholder="Where is it? e.g. the JCR"></div>
+    <div class="field"><label for="nc-close">Closes</label><select id="nc-close"><option>Tonight, 11pm</option><option>Tomorrow, 6pm</option><option selected>Friday, 6pm</option><option>Sunday, 8pm</option></select></div>
+    <button class="primary" data-act="post-call">${official?'Send suggestion':'Post call'}</button>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+function postCall(){
+  const q = $('#nc-q').value.trim(), err = $('#nc-err');
+  if(q.length < 10){ err.textContent = 'Write a full question, like "Will the library be open on Sunday?"'; err.classList.add('show'); return; }
+  const low = ' ' + q.toLowerCase() + ' ';
+  if(BANNED.some(w=>low.includes(w))){ err.textContent = "This call can't be posted. BNOC doesn't allow calls about relationships, health, appearance or grades. Try something people can cheer for instead."; err.classList.add('show'); return; }
+  const isEvent = $('#nc-event').checked, venue = $('#nc-venue').value.trim();
+  if(isEvent && !venue){ err.textContent = 'Add where the event is, so people know where to check in.'; err.classList.add('show'); return; }
+  const call = {id:'n'+Date.now(), comm:S.comm, q: q.endsWith('?')?q:q+'?', by:'me', yes:0, no:0, closes:$('#nc-close').value, status:'open'};
+  if(isEvent) call.event = {venue, when:call.closes};
+  if(newAbout){ call.about = newAbout; call.consent = 'pending'; }
+  S.calls.unshift(call); S.filter='open'; S.tab='calls';
+  closeSheet(); render();
+  if(comm().type!=='group'){
+    call.status='review'; call.closes = call.closes;
+    toast('Suggestion sent. BNOC reviews it before it goes live.');
+    setTimeout(()=>{ call.status='open'; call.by='auto'; call.src='Suggested by you'; call.yes=24; call.no=17; if(S.mode==='member'&&S.tab==='calls') render(); toast('BNOC approved your suggestion. It\'s live.'); }, 3500);
+    return;
+  }
+  if(newAbout){
+    const who = nameOf(newAbout);
+    toast(`Sent to ${who} to accept`);
+    setTimeout(()=>{ call.consent='accepted'; call.yes=4; call.no=3; if(S.mode==='member'&&S.tab==='calls') render(); toast(`${who} accepted your call. It's live.`); }, 4000);
+  } else {
+    toast('Your call is live');
+    setTimeout(()=>{ call.yes+=6; call.no+=4; if(S.mode==='member'&&S.tab==='calls') render(); }, 2500);
+  }
+}
+
+function openSettle(id){
+  const c = S.calls.find(x=>x.id===id);
+  const auto = c.by==='auto';
+  openSheet(`<h2 id="sheet-title">${auto?'Pick the result':'What happened?'}</h2>
+    <p class="lead">${esc(c.q)}</p>
+    <div class="vote" style="margin-bottom:12px"><button class="yes" data-act="settle-pick" data-id="${id}" data-r="yes">It happened: Yes</button><button class="no" data-act="settle-pick" data-id="${id}" data-r="no">It didn't: No</button></div>
+    <p class="lead" style="font-size:13px">${auto?'In the real app this settles itself from the official result. Here you can pick one to see the scoring.':'Members have 24 hours to dispute your result before scores update. In this demo, it happens straight away.'}</p>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+function settle(id, r){
+  const c = S.calls.find(x=>x.id===id);
+  c.status='resolved'; c.result=r; c.closes='Settled';
+  closeSheet();
+  if(!c.mine){ S.filter='resolved'; render(); toast('Call settled'); return; }
+  const cf = CONF[c.mine.conf], right = c.mine.side===r;
+  let pts = right ? cf.win : -cf.lose;
+  const doubled = right && c.event && c.mine.checkedIn;
+  if(doubled) pts *= 2;
+  c.mine.pts = pts; addScore(pts);
+  if(right) S.week.right++;
+  addLog(`${right?'Right':'Wrong'}: ${c.q.slice(0,30)}…`, pts>0?`+${pts}`:pts<0?`−${-pts}`:'0', pts>=0?'plus':'minus');
+  S.filter='resolved'; render();
+  if(right){
+    openSheet(`${checkSvg}<h2 id="sheet-title" class="center">You called it</h2><p class="lead center">+${pts} points${doubled?', doubled because you showed up':''}. You're now ${ord(myRank())} in ${esc(comm().name)}.</p>
+      <button class="primary" data-act="close-go" data-tab="ranks">See the leaderboard</button><button class="secondary" data-act="close">Done</button>`);
+  } else {
+    toast(pts<0 ? `Not this time: ${pts} for being ${cf.label.toLowerCase()}` : 'Not this time. A hunch costs nothing.');
+  }
+}
+
+function qrSvg(id){
+  let cells=''; let seedN = id.length*7+3;
+  for(let y=0;y<17;y++) for(let x=0;x<17;x++){
+    seedN = (seedN*9301+49297)%233280;
+    const corner = (x<5&&y<5)||(x>11&&y<5)||(x<5&&y>11);
+    if(corner){ const cx=x>11?x-12:x, cy=y>11?y-12:y; if(cx===0||cx===4||cy===0||cy===4||(cx===2&&cy===2)) cells+=`<rect x="${x}" y="${y}" width="1" height="1"/>`; }
+    else if(seedN/233280 > .52) cells+=`<rect x="${x}" y="${y}" width="1" height="1"/>`;
+  }
+  return `<div class="qr"><div class="qr-box"><svg viewBox="0 0 17 17" width="170" height="170" fill="#2D1B3D" aria-label="Sample check-in code">${cells}</svg><span class="scanline" aria-hidden="true"></span></div></div>`;
+}
+function openCheckin(id){
+  const ch = S.challenges.find(x=>x.id===id);
+  openSheet(`<h2 id="sheet-title">Check in at ${esc(ch.biz)}</h2>
+    <p class="lead">Scan the BNOC code at the counter. The code changes every minute, so it only works in person. In this demo, tap the button.</p>
+    ${qrSvg(id)}
+    <button class="primary" data-act="do-checkin" data-id="${id}">Simulate scan</button>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+function doCheckin(id){
+  const ch = S.challenges.find(x=>x.id===id);
+  ch.checkedIn = true; addScore(BIZ_PTS); S.week.places++;
+  addLog(`Checked in at ${ch.biz}`, `+${BIZ_PTS}`, 'plus');
+  if(id==='jacks'){ S.biz.checkins++; S.biz.week[6]++; }
+  let extra = '';
+  if(ch.type==='visits'){
+    ch.have = Math.min(ch.need, ch.have+1);
+    if(ch.have>=ch.need && !S.prizes.find(p=>p.id==='p-bean')){
+      S.prizes.unshift({id:'p-bean', biz:ch.biz, what:ch.prize, code:'BNOC-BL7Q', exp:'Valid for 14 days', used:false, color:ch.color});
+      extra = ` You unlocked: ${ch.prize}!`;
+    }
+  }
+  render();
+  openSheet(`${checkSvg}<h2 id="sheet-title" class="center">Checked in</h2><p class="lead center">+${BIZ_PTS} points at ${esc(ch.biz)}.${esc(extra)}</p>
+    <button class="primary" data-act="close">Nice</button>`);
+}
+function openEventCheckin(id){
+  const c = S.calls.find(x=>x.id===id);
+  openSheet(`<h2 id="sheet-title">Check in at ${esc(c.event.venue)}</h2>
+    <p class="lead">Scan the event's BNOC code on the night. It only works in person. In this demo, tap the button.</p>
+    ${qrSvg(id)}
+    <button class="primary" data-act="do-event-checkin" data-id="${id}">Simulate scan</button>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+function doEventCheckin(id){
+  const c = S.calls.find(x=>x.id===id);
+  c.mine.checkedIn = true; addScore(CHECKIN_PTS); S.week.places++;
+  addLog(`Turned up: ${c.event.venue}`, `+${CHECKIN_PTS}`, 'plus');
+  render();
+  openSheet(`${checkSvg}<h2 id="sheet-title" class="center">You showed up</h2><p class="lead center">+${CHECKIN_PTS} for being there, and your points on this call will be doubled if you're right.</p>
+    <button class="primary" data-act="close">Nice</button>`);
+}
+
+function openReveal(){
+  const b = board(), r = myRank();
+  openSheet(`<h2 id="sheet-title" class="center">Sunday reveal</h2>
+    <p class="lead center">This week in ${esc(comm().name)}</p>
+    <div class="reveal-rank">${ord(r)}</div>
+    <p class="lead center">${esc(nameOf(b[0].id==='me'?'me':b[0].id))} ${b[0].id==='me'?'(you!) top':'tops'} the table${comm().id==='cambridge'?" and wins Jack's Gelato's free gelato":''}.</p>
+    <div class="recap"><div><b>${S.week.right}</b><span>right calls</span></div><div><b>${S.week.calls}</b><span>calls made</span></div><div><b>${S.week.places}</b><span>places you showed up</span></div></div>
+    <p class="lead center" style="font-size:13px">Every Sunday at 8pm: winners, prizes, and next week's calls from your host.</p>
+    <button class="primary" data-act="close">Bring on next week</button>`);
+}
+
+function showCode(id){
+  const p = S.prizes.find(x=>x.id===id);
+  openSheet(`<h2 id="sheet-title">${esc(p.what)}</h2><p class="lead">Show this at ${esc(p.biz)}. Staff tap "Redeem" on their side.</p>
+    <div class="code">${esc(p.code)}</div><p class="lead center" style="font-size:13px">${esc(p.exp)}</p>
+    <button class="primary" data-act="redeem" data-id="${id}">Staff: mark as redeemed</button><button class="secondary" data-act="close">Close</button>`);
+}
+
+function openNewChallenge(){
+  openSheet(`<h2 id="sheet-title">Create a challenge</h2>
+    <p class="lead">Set a prize and a goal. Members nearby see it in their Local tab.</p>
+    <div class="err" id="ncc-err" role="alert"></div>
+    <div class="field"><label for="ncc-t">Challenge name</label><input type="text" id="ncc-t" maxlength="50" placeholder="Rainy day scoop"></div>
+    <div class="field"><label for="ncc-p">Prize you'll give</label><input type="text" id="ncc-p" maxlength="40" placeholder="Free waffle cone"></div>
+    <div class="field"><label for="ncc-type">How people win</label><select id="ncc-type"><option value="top">Top caller of the week</option><option value="visits">Check in 3 times</option></select></div>
+    <button class="primary dark" data-act="post-challenge">Launch challenge</button>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+function postChallenge(){
+  const t = $('#ncc-t').value.trim(), p = $('#ncc-p').value.trim(), type = $('#ncc-type').value;
+  if(!t || !p){ const e=$('#ncc-err'); e.textContent='Add a name and a prize so members know what they can win.'; e.classList.add('show'); return; }
+  S.biz.challenges.unshift({title:t, prize:p, ends:'in 7 days'});
+  S.challenges.unshift({id:'b'+Date.now(), biz:S.biz.name, title:t, body: type==='top' ? `The top caller in your community this week wins. Check in at the shop for ${BIZ_PTS} bonus points.` : 'Check in on three different days to win.', prize:p, ends:'Ends in 7 days', color:'#D9482A', type, need:3, have:0, checkedIn:false, joined:0, icon:'gelato'});
+  closeSheet(); render(); toast('Challenge launched. Switch to Member app to see it.');
+}
+
+function spaceRow(c){
+  const sub = c.type==='group' ? `Private group in ${esc(parentOf(c).name)} · ${c.people.length+1} people` : `Official · ${c.members.toLocaleString()} people · run by BNOC`;
+  return `<button class="prize-card" style="width:100%;text-align:left;cursor:pointer" data-act="pick-comm" data-id="${c.id}"><span class="ic" style="background:${c.type==='group'?'var(--coral)':'var(--plum)'};color:#fff;font-family:var(--display);font-weight:800">${esc(c.short)}</span><span class="t"><b>${esc(c.name)}</b><span>${sub}</span></span>${c.id===S.comm?'<span class="chip ok">Current</span>':''}</button>`;
+}
+function openCommSwitch(){
+  openSheet(`<h2 id="sheet-title">Where you play</h2>
+    <p class="lead">Official communities bring the calls. Your groups bring your friends: each group gets every call from its community, ranked just among you.</p>
+    <h3 class="section-h" style="margin-top:4px">Your groups</h3>
+    ${S.groups.map(spaceRow).join('')}
+    <button class="secondary" data-act="new-group">Create a group</button>
+    <h3 class="section-h">Official communities</h3>
+    ${OFFICIAL.map(spaceRow).join('')}`);
+}
+let newPeople = [];
+function openNewGroup(){
+  newPeople = [];
+  openSheet(`<h2 id="sheet-title">Create a group</h2>
+    <p class="lead">Pick a community to build on. Your group gets all its calls automatically, so it's never empty, and you can add your own.</p>
+    <div class="err" id="ng-err" role="alert"></div>
+    <div class="field"><label for="ng-name">Group name</label><input type="text" id="ng-name" maxlength="30" placeholder="e.g. Flat 4"></div>
+    <div class="field"><label for="ng-parent">Built on</label><select id="ng-parent">${OFFICIAL.map(o=>`<option value="${o.id}">${esc(o.name)}</option>`).join('')}</select></div>
+    <div class="field"><label id="ng-inv-l">Invite friends</label>
+      <div class="opts" role="group" aria-labelledby="ng-inv-l">${S.members.filter(m=>!m.stranger).map(m=>`<button class="opt" data-act="invite-pick" data-id="${m.id}" aria-pressed="false">${esc(m.name)}</button>`).join('')}</div></div>
+    <button class="primary" data-act="post-group">Create group</button>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+function postGroup(){
+  const n = $('#ng-name').value.trim(), par = $('#ng-parent').value;
+  if(!n){ const e=$('#ng-err'); e.textContent='Give your group a name.'; e.classList.add('show'); return; }
+  if(!newPeople.length){ const e=$('#ng-err'); e.textContent='Invite at least one friend.'; e.classList.add('show'); return; }
+  const g = {id:'g'+Date.now(), type:'group', name:n, short:n.replace(/[^A-Za-z0-9 ]/g,'').split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'GR', parent:par, admin:'me', people:newPeople.slice()};
+  S.groups.push(g); S.comm = g.id; S.tab='calls'; S.filter='open';
+  closeSheet(); render();
+  toast(`${n} is ready with every ${spaceById(par).name} call already in it`);
+}
+function openReport(){
+  openSheet(`<h2 id="sheet-title">Report this call</h2><p class="lead">Group admins and the BNOC team review reports. Calls that break the rules are removed.</p>
+    <div class="opts" style="flex-direction:column">${["It's about someone who didn't agree","It's hurtful or embarrassing","It's about a banned topic","Something else"].map(r=>`<button class="opt" style="text-align:left" data-act="report-send">${r}</button>`).join('')}</div>
+    <button class="secondary" data-act="close">Cancel</button>`);
+}
+function openAbout(){
+  openSheet(`<h2 id="sheet-title">About this demo</h2><p class="lead">BNOC (Big Name On Campus) is a proof of concept for the King's E-Lab. Call what happens in your community, show up, and win prizes from local places. There's no money and nothing to spend: you earn points by being right and by turning up.</p>
+    <p class="lead">Official communities (Trinity College, Cambridge) bring the calls; private groups (Rugby team, King's E-Lab) bring your friends. Try: switching between them, creating a group, calling Yes or No with a confidence level, an event call with a check-in (double points), making a call about a friend, checking in at Jack's Gelato, settling your snow call under Yours, the Sunday reveal in Ranks, and the Business view. All data is sample data.</p>
+    <button class="secondary" data-act="reset">Restart the demo</button><button class="primary" data-act="close">Got it</button>`);
+}
+
+// ---------- Onboarding ----------
+let obComm = 'college';
+const START_GROUP = {college:'rugby', cambridge:'elab'};
+function renderOnboard(){
+  $('#ob-comms').innerHTML = OFFICIAL.map(c=>`<button class="opt" data-act="ob-comm" data-id="${c.id}" aria-pressed="${c.id===obComm}">${esc(c.name)}</button>`).join('');
+}
+
+// ---------- Events ----------
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-act]'); if(!b) return;
+  const a = b.dataset.act, id = b.dataset.id;
+  switch(a){
+    case 'join': {
+      const n = $('#ob-name').value.trim();
+      S.me = n || 'Araha'; S.comm = START_GROUP[obComm]; S.joined = true;
+      $('#onboard').classList.add('hide'); render();
+      toast(`Welcome, ${S.me}. Your friends added you to ${comm().name}.`); break;
+    }
+    case 'ob-comm': obComm = id; renderOnboard(); break;
+    case 'tab': S.tab = b.dataset.tab; S.mode='member'; closeSheet(); render(); $('#content').scrollTop=0; break;
+    case 'mode': S.mode = b.dataset.mode; render(); $('#content').scrollTop=0; break;
+    case 'filter': S.filter = b.dataset.f; render(); break;
+    case 'call': openCall(id, b.dataset.side); break;
+    case 'conf': callCtx.conf = b.dataset.k; document.querySelectorAll('[data-act="conf"]').forEach(x=>x.setAttribute('aria-pressed', String(x.dataset.k===callCtx.conf))); updateEst(); break;
+    case 'confirm-call': confirmCall(); break;
+    case 'event-checkin': openEventCheckin(id); break;
+    case 'do-event-checkin': doEventCheckin(id); break;
+    case 'new-call': openNewCall(); break;
+    case 'about-pick': newAbout = id; document.querySelectorAll('[data-act="about-pick"]').forEach(x=>x.setAttribute('aria-pressed', String(x.dataset.id===id))); break;
+    case 'post-call': postCall(); break;
+    case 'settle': openSettle(id); break;
+    case 'settle-pick': settle(id, b.dataset.r); break;
+    case 'checkin': openCheckin(id); break;
+    case 'do-checkin': doCheckin(id); break;
+    case 'goto-call': { const gc=S.calls.find(x=>x.id===id); if(gc) S.comm=gc.comm; S.tab='calls'; S.filter='open'; S.mode='member'; render(); setTimeout(()=>toast(`Showing ${comm().name}: call the open mic turnout`), 100); break; }
+    case 'reveal': openReveal(); break;
+    case 'show-code': showCode(id); break;
+    case 'redeem': { const p=S.prizes.find(x=>x.id===id); p.used=true; if(p.biz===S.biz.name) S.biz.redeemed++; closeSheet(); render(); toast('Prize redeemed. Enjoy!'); break; }
+    case 'switch-comm': openCommSwitch(); break;
+    case 'pick-comm': S.comm=id; S.filter='open'; closeSheet(); render(); toast(`Switched to ${comm().name}`); break;
+    case 'new-group': openNewGroup(); break;
+    case 'invite-pick': { const on = b.getAttribute('aria-pressed')!=='true'; b.setAttribute('aria-pressed', String(on)); newPeople = on ? newPeople.concat(id) : newPeople.filter(x=>x!==id); break; }
+    case 'post-group': postGroup(); break;
+    case 'report': openReport(); break;
+    case 'report-send': closeSheet(); toast('Thanks. This call will be reviewed.'); break;
+    case 'new-challenge': openNewChallenge(); break;
+    case 'post-challenge': postChallenge(); break;
+    case 'go-wallet': S.tab='wallet'; S.mode='member'; render(); break;
+    case 'close-go': closeSheet(); S.tab=b.dataset.tab; render(); break;
+    case 'about': openAbout(); break;
+    case 'close': closeSheet(); break;
+    case 'reset': closeSheet(); S = seed(); obComm='college'; $('#ob-name').value=''; renderOnboard(); $('#onboard').classList.remove('hide'); render(); break;
+  }
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#sheet').classList.contains('open')) closeSheet(); });
+$('#ob-name').addEventListener('keydown', e=>{ if(e.key==='Enter') document.querySelector('[data-act="join"]').click(); });
+
+renderOnboard();
+render();
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2D1B3D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>BNOC · Big Name On Campus</title>
+<meta name="description" content="Call what happens around King's E-Lab, earn points for being right, and get rewarded for showing up.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2216%22 fill=%22%23FF6B4A%22/%3E%3Ctext x=%2232%22 y=%2246%22 font-family=%22Arial Black,Arial%22 font-weight=%22900%22 font-size=%2238%22 text-anchor=%22middle%22 fill=%22white%22%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+</head>
+<body>
+<main class="stage">
+
+  <div class="phone">
+    <div class="screen" id="screen">
+      <div class="toast" id="toast" role="status" aria-live="polite"><span class="ti" aria-hidden="true">✓</span><span id="toast-text"></span></div>
+
+      <!-- Login, "check your email" and "what's your name" screens render here -->
+      <div class="onboard" id="gate"><p class="mark">BN<span>O</span>C</p><p class="full">Loading…</p></div>
+
+      <header class="top" id="top" hidden>
+        <button class="comm-btn" data-act="switch-comm" aria-label="Switch community"><span class="dot" id="comm-dot">KE</span><span class="name" id="comm-name">King's E-Lab</span></button>
+        <div class="top-right">
+          <button class="pts-pill" data-act="tab" data-tab="me" aria-label="Your season score"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg><span id="pts">0</span></button>
+          <button class="about-btn" data-act="about" aria-label="How BNOC works">?</button>
+        </div>
+      </header>
+
+      <div class="content" id="content" tabindex="-1" hidden></div>
+
+      <nav class="nav" id="nav" aria-label="Main" hidden>
+        <button data-act="tab" data-tab="calls"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Calls</button>
+        <button data-act="tab" data-tab="groups"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>Groups</button>
+        <button class="fab" data-act="new-call" aria-label="Make a call"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button data-act="tab" data-tab="ranks"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Ranks</button>
+        <button data-act="tab" data-tab="me"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Me</button>
+      </nav>
+
+      <div class="scrim" id="scrim" data-act="close"></div>
+      <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"></div>
+    </div>
+  </div>
+</main>
+<!-- Keep the address-bar fragment before the login library reads and clears it -->
+<script>window.__initialHash = location.hash;</script>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
