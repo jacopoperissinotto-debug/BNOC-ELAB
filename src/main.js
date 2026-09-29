@@ -89,20 +89,52 @@ function renderAdminPage() {
 // ---------- Calls ----------
 const KE_AVATAR = `<span class="avatar" style="background:var(--plum)" aria-hidden="true">${COMMUNITY.short}</span>`;
 
-// A tiny line showing how the crowd forecast moved (up = more likely the first answer).
+const EARLY_READ = 5;   // below this many calls, the forecast is labelled "Early read"
+
+// A small smooth line showing how the forecast moved (up = more likely), on a fixed 0–100% scale
+// so small wobbles look small. Drawn as a curve through the points rather than sharp zig-zags.
 function sparkline(trend) {
   if (!trend || trend.length < 2) return '';
-  const w = 96, h = 24, pad = 3;
-  const xy = trend.map((v, i) => [pad + i / (trend.length - 1) * (w - 2 * pad), pad + (1 - v / 100) * (h - 2 * pad)]);
-  const [ex, ey] = xy[xy.length - 1];
+  const w = 88, h = 26, pad = 3;
+  const pts = trend.map((v, i) => [pad + i / (trend.length - 1) * (w - 2 * pad), pad + (1 - v / 100) * (h - 2 * pad)]);
+  const f = n => n.toFixed(1);
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)},${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)},${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])},${f(p2[1])}`;
+  }
+  const [ex, ey] = pts[pts.length - 1];
   return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
-    <line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" class="mid"/>
-    <polyline points="${xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}"/>
-    <circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="2.5"/></svg>`;
+    <line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" class="mid"/><path d="${d}"/><circle cx="${f(ex)}" cy="${f(ey)}" r="2.5"/></svg>`;
+}
+
+// The crowd forecast as a probability: "62% chance it happens" (Yes/No questions) or
+// "71% chance of The Eagle" (custom answers: whichever answer is ahead).
+function forecastBlock(c) {
+  if (!c.total) return `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`;
+  const yesNo = c.options[0] === 'Yes' && c.options[1] === 'No';
+  const lead = yesNo || c.forecast >= 50 ? 0 : 1;
+  const pct = lead === 0 ? c.forecast : 100 - c.forecast;
+  const trend = lead === 0 ? c.trend : c.trend.map(v => 100 - v);
+  const what = yesNo ? 'chance it happens' : `chance of ${esc(answer(c, lead))}`;
+  const early = c.total < EARLY_READ;
+  const status = c.status === 'open'
+    ? '<span class="live"><i aria-hidden="true"></i>Updated live</span>'
+    : '<span class="live off">Final forecast</span>';
+  return `<div class="fc ${early ? 'early' : ''}" role="img" aria-label="Crowd forecast: ${pct}% ${what}${early ? ', early read' : ''}">
+      <div class="fc-top">
+        <div class="fc-main">
+          <div><span class="fc-num">${pct}%</span>${early ? '<span class="early-pill">Early read</span>' : ''}</div>
+          <div class="fc-sub">${what}</div>
+        </div>
+        <div class="fc-side">${status}${sparkline(trend)}</div>
+      </div>
+      <div class="meter"><i style="width:${pct}%"></i></div>
+    </div>`;
 }
 
 function callCard(c) {
-  const total = c.total, p = total ? c.forecast : 50;
+  const total = c.total;
   let chips = '';
   if (c.status === 'closed') chips += '<span class="chip wait">Closed · result coming soon</span>';
   if (c.status === 'settled') {
@@ -125,10 +157,7 @@ function callCard(c) {
     <div class="call-meta">${KE_AVATAR}<span><b>${esc(COMMUNITY.name)}</b> · official call</span></div>
     <h3>${esc(c.q)}</h3>
     ${chips ? `<div class="chips">${chips}</div>` : ''}
-    ${total
-      ? `<div class="fc-head"><span>Crowd forecast</span>${sparkline(c.trend)}</div>
-        <div class="bar" role="img" aria-label="Crowd forecast: ${p}% ${esc(answer(c, 0))}, ${100 - p}% ${esc(answer(c, 1))}"><div class="y" style="width:${Math.min(Math.max(p, 24), 76)}%">${p >= 30 ? `<span class="lbl">${esc(answer(c, 0))}</span>` : ''}<b>${p}%</b></div><div class="n">${100 - p >= 30 ? `<span class="lbl">${esc(answer(c, 1))}</span>` : ''}<b>${100 - p}%</b></div></div>`
-      : `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`}
+    ${forecastBlock(c)}
     <div class="call-foot"><span>${total ? `${total} ${total === 1 ? 'person' : 'people'} called it · ` : ''}${when}</span>
       <button class="cmt-btn" data-act="comments" data-id="${c.id}" aria-label="${c.comments} comments">${BUBBLE}${c.comments || 'Comment'}</button></div>
     ${action}

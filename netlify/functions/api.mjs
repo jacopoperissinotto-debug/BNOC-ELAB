@@ -138,20 +138,24 @@ const sample = (arr, n) => arr.length <= n ? arr : Array.from({ length: n }, (_,
 
 // How many people picked each answer, plus the crowd forecast: the average of everyone's
 // calls as probabilities. "Certain: Yes" counts as 90% Yes, "Hunch: No" as 40% Yes, and so on,
-// so surer calls move it more. `forecast` is the % chance of the first answer; `trend` is how
-// it moved as calls came in (only once 3+ people have called).
+// so surer calls move it more. Every call also starts with two invisible "don't know" (50%)
+// votes, so a handful of early calls nudge the forecast instead of swinging it to an extreme.
+// `forecast` is the % chance of the first answer; `trend` is how it moved from the 50% start
+// (only once 3+ people have called, smoothed to at most 12 points).
+const PRIOR_VOTES = 2;
+
 function tally(world, call) {
   const counts = optionsOf(call).map(() => 0);
   const fs = world.forecasts
     .filter(f => f.callId === call.id && inTime(f, call) && f.pick < counts.length)
     .sort((a, b) => a.at - b.at);
-  const path = [];
-  let sum = 0;
+  const path = [50];
+  let sum = PRIOR_VOTES * 0.5;
   fs.forEach((f, i) => {
     counts[f.pick]++;
     const p = CONF[f.conf].p;
     sum += f.pick === 0 ? p : 1 - p;
-    path.push(Math.round(sum / (i + 1) * 100));
+    path.push(Math.round(sum / (i + 1 + PRIOR_VOTES) * 100));
   });
   return {
     counts,
