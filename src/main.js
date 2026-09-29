@@ -104,7 +104,7 @@ function callCard(c) {
     action = `<div class="vote"><button class="yes" data-act="call" data-id="${c.id}" data-pick="0">${esc(answer(c, 0))}</button><button class="no" data-act="call" data-id="${c.id}" data-pick="1">${esc(answer(c, 1))}</button></div>`;
   } else if (c.mine && c.status !== 'settled') {
     const cf = CONF[c.mine.conf];
-    action = `<div class="my-stake"><span>You called ${tag(c, c.mine.pick)} · ${cf.label}</span><span>+${cf.win} if right</span></div>`;
+    action = `<div class="my-stake"><span>You called ${tag(c, c.mine.pick)} · ${cf.label}</span><span class="locked">Locked in</span></div>`;
   }
   const when = c.status === 'open' ? `Closes ${fmtWhen(c.closesAt)}` : c.status === 'closed' ? `Closed ${fmtWhen(c.closesAt)}` : 'Settled';
   return `<article class="call">
@@ -112,7 +112,7 @@ function callCard(c) {
     <h3>${esc(c.q)}</h3>
     ${chips ? `<div class="chips">${chips}</div>` : ''}
     ${total
-      ? `<div class="bar" role="img" aria-label="The crowd says ${p}% ${esc(answer(c, 0))}, ${100 - p}% ${esc(answer(c, 1))}"><div class="y" style="width:${Math.min(Math.max(p, 24), 76)}%"><span class="lbl">${esc(answer(c, 0))}</span><b>${p}%</b></div><div class="n"><span class="lbl">${esc(answer(c, 1))}</span><b>${100 - p}%</b></div></div>`
+      ? `<div class="bar" role="img" aria-label="The crowd says ${p}% ${esc(answer(c, 0))}, ${100 - p}% ${esc(answer(c, 1))}"><div class="y" style="width:${Math.min(Math.max(p, 24), 76)}%">${p >= 30 ? `<span class="lbl">${esc(answer(c, 0))}</span>` : ''}<b>${p}%</b></div><div class="n">${100 - p >= 30 ? `<span class="lbl">${esc(answer(c, 1))}</span>` : ''}<b>${100 - p}%</b></div></div>`
       : `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`}
     <div class="call-foot"><span>${total ? `${total} ${total === 1 ? 'person' : 'people'} called it · ` : ''}${when}</span>
       <button class="cmt-btn" data-act="comments" data-id="${c.id}" aria-label="${c.comments} comments">${BUBBLE}${c.comments || 'Comment'}</button></div>
@@ -140,20 +140,16 @@ function openCall(id, pick) {
   const c = S.state.calls.find(x => x.id === id);
   if (!c) return;
   S.callCtx = { id, pick, conf: 'sure' };
-  openSheet(`<h2 id="sheet-title">${esc(c.q)}</h2>
-    <p class="lead">You're calling ${tag(c, pick)}. How sure are you?</p>
-    <div class="conf" role="group" aria-label="Confidence">${Object.entries(CONF).map(([k, v]) => `<button data-act="conf" data-k="${k}" aria-pressed="${k === 'sure'}"><b>${v.label}</b><span>${v.pct}</span></button>`).join('')}</div>
-    <div class="est" id="call-est"></div>
+  const dots = n => `<span class="dots" aria-hidden="true">${[1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+  openSheet(`<p class="sheet-q">${esc(c.q)}</p>
+    <h2 id="sheet-title">You're calling ${tag(c, pick)}</h2>
+    <p class="lead">How sure are you?</p>
+    <div class="conf" role="group" aria-label="How sure are you?">${Object.entries(CONF).map(([k, v]) => `<button data-act="conf" data-k="${k}" aria-pressed="${k === 'sure'}">${dots(v.level)}<b>${v.label}</b><span>${v.hint}</span></button>`).join('')}</div>
+    <p class="conf-note">The surer you are, the more you win if you're right, and the more you risk if you're wrong.</p>
     <div class="err" id="call-err" role="alert"></div>
-    <button class="primary" data-act="confirm-call">Call ${esc(answer(c, pick))}</button>
+    <button class="primary" data-act="confirm-call">Lock in my call</button>
     <button class="secondary" data-act="close">Cancel</button>
-    <p class="lead center" style="font-size:12.5px;margin:12px 0 0">Calls are locked once made.</p>`);
-  updateEst();
-}
-
-function updateEst() {
-  const cf = CONF[S.callCtx.conf];
-  $('#call-est').innerHTML = `Right: <b>+${cf.win}</b>. Wrong: <b>${cf.lose ? '−' + cf.lose : 'no change'}</b>. You aren't spending anything.`;
+    <p class="lead center" style="font-size:12.5px;margin:12px 0 0">You can't change a call once it's locked in.</p>`);
 }
 
 async function confirmCall(btn) {
@@ -169,7 +165,7 @@ async function confirmCall(btn) {
   }
   S.state = data.state;
   closeSheet(); render();
-  toast(`Called ${label}, ${CONF[conf].label.toLowerCase()}`);
+  toast(`Locked in: ${label}, ${CONF[conf].label.toLowerCase()}`);
 }
 
 // ---------- Comments ----------
@@ -405,7 +401,6 @@ document.addEventListener('click', e => {
     case 'conf':
       S.callCtx.conf = b.dataset.k;
       document.querySelectorAll('[data-act="conf"]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.k === S.callCtx.conf)));
-      updateEst();
       break;
     case 'confirm-call': confirmCall(b); break;
     case 'suggest': openSuggest(); break;
