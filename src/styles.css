@@ -331,3 +331,13 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .screen{overflow:clip}
 .sheet{visibility:hidden;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s linear .28s}
 .sheet.open{visibility:visible;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s}
+/* Forecast in the colour of the answer it's about: first answer coral (default), second plum */
+.fc.pick-1 .fc-num{color:var(--plum)}
+.fc.pick-1 .meter i{background:var(--plum)}
+.fc.pick-1 .spark path{stroke:var(--plum)}
+.fc.pick-1 .spark circle{fill:var(--plum)}
+/* Early reads stay grey whichever answer they're about */
+.fc.early.pick-1 .fc-num{color:var(--muted)}
+.fc.early.pick-1 .meter i{background:#B8AEC7}
+.fc.early.pick-1 .spark path{stroke:#B8AEC7}
+.fc.early.pick-1 .spark circle{fill:#B8AEC7}

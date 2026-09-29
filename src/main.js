@@ -110,23 +110,24 @@ function sparkline(trend) {
     <line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" class="mid"/><path d="${d}"/><circle cx="${f(ex)}" cy="${f(ey)}" r="2.5"/></svg>`;
 }
 
-// The crowd forecast as a probability: "62% chance it happens" (Yes/No questions) or
-// "71% chance of The Eagle" (custom answers: whichever answer is ahead).
-const LOCK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
-
+// The crowd forecast as a probability, always about the answer that matters to you: your own call
+// if you made one, otherwise whichever answer is ahead. It takes that answer's colour everywhere
+// (first answer = coral, second = plum), matching the buttons and the "You called" tag.
 function forecastBlock(c) {
   if (!c.total) return `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`;
   if (c.hidden) return `<div class="bar bar-empty fc-locked">${LOCK}Make your call to see the crowd forecast</div>`;
   const yesNo = c.options[0] === 'Yes' && c.options[1] === 'No';
-  const lead = yesNo || c.forecast >= 50 ? 0 : 1;
-  const pct = lead === 0 ? c.forecast : 100 - c.forecast;
-  const trend = lead === 0 ? c.trend : c.trend.map(v => 100 - v);
-  const what = yesNo ? 'chance it happens' : `chance of ${esc(answer(c, lead))}`;
+  const focus = c.mine ? c.mine.pick : (c.forecast >= 50 ? 0 : 1);
+  const pct = focus === 0 ? c.forecast : 100 - c.forecast;
+  const trend = focus === 0 ? c.trend : c.trend.map(v => 100 - v);
+  const what = yesNo
+    ? (focus === 0 ? 'chance it happens' : "chance it doesn't happen")
+    : `chance of ${esc(answer(c, focus))}`;
   const early = c.total < EARLY_READ;
   const status = c.status === 'open'
     ? '<span class="live"><i aria-hidden="true"></i>Updated live</span>'
     : '<span class="live off">Final forecast</span>';
-  return `<div class="fc ${early ? 'early' : ''}" role="img" aria-label="Crowd forecast: ${pct}% ${what}${early ? ', early read' : ''}">
+  return `<div class="fc pick-${focus} ${early ? 'early' : ''}" role="img" aria-label="Crowd forecast: ${pct}% ${what}${early ? ', early read' : ''}">
       <div class="fc-top">
         <div class="fc-main">
           <div><span class="fc-num">${pct}%</span>${early ? '<span class="early-pill">Early read</span>' : ''}</div>
