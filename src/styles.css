@@ -302,3 +302,9 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .move button:hover:not([disabled]){border-color:var(--plum)}
 .move button[disabled]{opacity:.35;cursor:default}
 .seg-count{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--coral);color:#fff;font-size:11px;margin-left:3px;vertical-align:1px}
+
+/* Crowd forecast */
+.fc-head{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:var(--muted);margin:0 2px 6px;letter-spacing:.2px}
+.spark polyline{fill:none;stroke:var(--coral);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.spark .mid{stroke:var(--line);stroke-width:1;stroke-dasharray:3 3}
+.spark circle{fill:var(--coral)}

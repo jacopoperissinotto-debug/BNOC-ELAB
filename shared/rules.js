@@ -2,10 +2,11 @@
 
 // Forecasting, not staking: you never put points in. Being right earns points, scaled by confidence.
 // `level` and `hint` are what people see when picking; the numbers only appear on the Rules page.
+// `p` is how likely the person thinks their answer is: it feeds the crowd forecast.
 export const CONF = {
-  hunch:   { label: 'Hunch',       hint: 'Just a feeling',   level: 1, pct: '60%', win: 10, lose: 0 },
-  sure:    { label: 'Fairly sure', hint: 'Pretty confident', level: 2, pct: '75%', win: 20, lose: 5 },
-  certain: { label: 'Certain',     hint: 'No doubt',         level: 3, pct: '90%', win: 30, lose: 15 }
+  hunch:   { label: 'Hunch',       hint: 'Just a feeling',   level: 1, p: 0.60, pct: '60%', win: 10, lose: 0 },
+  sure:    { label: 'Fairly sure', hint: 'Pretty confident', level: 2, p: 0.75, pct: '75%', win: 20, lose: 5 },
+  certain: { label: 'Certain',     hint: 'No doubt',         level: 3, p: 0.90, pct: '90%', win: 30, lose: 15 }
 };
 
 export const COMMUNITY = { name: "King's E-Lab", short: 'KE' };

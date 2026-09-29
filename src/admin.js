@@ -200,7 +200,7 @@ function callAdminCard(c, i, group) {
   return `<article class="call">
     <div class="call-head">${mover}<h3>${esc(c.q)}</h3></div>
     <div class="chips">${statusChip(c)}</div>
-    <div class="call-foot"><span><b>${c.counts[0]}</b> ${esc(answer(c, 0))} · <b>${c.counts[1]}</b> ${esc(answer(c, 1))}</span><button class="report" data-act="remove" data-id="${c.id}">Remove call</button></div>
+    <div class="call-foot"><span><b>${c.counts[0]}</b> ${esc(answer(c, 0))} · <b>${c.counts[1]}</b> ${esc(answer(c, 1))}${c.total ? ` · forecast ${c.forecast}% ${esc(answer(c, 0))}` : ''}</span><button class="report" data-act="remove" data-id="${c.id}">Remove call</button></div>
     ${action}
     <button class="link-btn" data-act="toggle-comments" data-id="${c.id}">${A.openComments.has(c.id) ? 'Hide' : 'Show'} comments (${c.comments})</button>
     ${commentsHtml(c)}

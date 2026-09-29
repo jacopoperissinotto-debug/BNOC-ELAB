@@ -132,13 +132,33 @@ function callOrder(a, b) {
   return position(a) - position(b) || a.id.localeCompare(b.id);
 }
 
-// How many people picked each answer.
+// Pick up to n evenly spaced values (always the first and last), so the trend line
+// shows the shape without revealing each individual call.
+const sample = (arr, n) => arr.length <= n ? arr : Array.from({ length: n }, (_, k) => arr[Math.round(k * (arr.length - 1) / (n - 1))]);
+
+// How many people picked each answer, plus the crowd forecast: the average of everyone's
+// calls as probabilities. "Certain: Yes" counts as 90% Yes, "Hunch: No" as 40% Yes, and so on,
+// so surer calls move it more. `forecast` is the % chance of the first answer; `trend` is how
+// it moved as calls came in (only once 3+ people have called).
 function tally(world, call) {
   const counts = optionsOf(call).map(() => 0);
-  for (const f of world.forecasts) {
-    if (f.callId === call.id && inTime(f, call) && f.pick < counts.length) counts[f.pick]++;
-  }
-  return { counts, total: counts.reduce((a, b) => a + b, 0) };
+  const fs = world.forecasts
+    .filter(f => f.callId === call.id && inTime(f, call) && f.pick < counts.length)
+    .sort((a, b) => a.at - b.at);
+  const path = [];
+  let sum = 0;
+  fs.forEach((f, i) => {
+    counts[f.pick]++;
+    const p = CONF[f.conf].p;
+    sum += f.pick === 0 ? p : 1 - p;
+    path.push(Math.round(sum / (i + 1) * 100));
+  });
+  return {
+    counts,
+    total: fs.length,
+    forecast: fs.length ? path[path.length - 1] : null,
+    trend: fs.length >= 3 ? sample(path, 12) : []
+  };
 }
 
 const callSummary = (world, c) => ({

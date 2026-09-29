@@ -89,8 +89,20 @@ function renderAdminPage() {
 // ---------- Calls ----------
 const KE_AVATAR = `<span class="avatar" style="background:var(--plum)" aria-hidden="true">${COMMUNITY.short}</span>`;
 
+// A tiny line showing how the crowd forecast moved (up = more likely the first answer).
+function sparkline(trend) {
+  if (!trend || trend.length < 2) return '';
+  const w = 96, h = 24, pad = 3;
+  const xy = trend.map((v, i) => [pad + i / (trend.length - 1) * (w - 2 * pad), pad + (1 - v / 100) * (h - 2 * pad)]);
+  const [ex, ey] = xy[xy.length - 1];
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" class="mid"/>
+    <polyline points="${xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}"/>
+    <circle cx="${ex.toFixed(1)}" cy="${ey.toFixed(1)}" r="2.5"/></svg>`;
+}
+
 function callCard(c) {
-  const total = c.total, p = total ? Math.round(c.counts[0] / total * 100) : 50;
+  const total = c.total, p = total ? c.forecast : 50;
   let chips = '';
   if (c.status === 'closed') chips += '<span class="chip wait">Closed · result coming soon</span>';
   if (c.status === 'settled') {
@@ -114,7 +126,8 @@ function callCard(c) {
     <h3>${esc(c.q)}</h3>
     ${chips ? `<div class="chips">${chips}</div>` : ''}
     ${total
-      ? `<div class="bar" role="img" aria-label="The crowd says ${p}% ${esc(answer(c, 0))}, ${100 - p}% ${esc(answer(c, 1))}"><div class="y" style="width:${Math.min(Math.max(p, 24), 76)}%">${p >= 30 ? `<span class="lbl">${esc(answer(c, 0))}</span>` : ''}<b>${p}%</b></div><div class="n">${100 - p >= 30 ? `<span class="lbl">${esc(answer(c, 1))}</span>` : ''}<b>${100 - p}%</b></div></div>`
+      ? `<div class="fc-head"><span>Crowd forecast</span>${sparkline(c.trend)}</div>
+        <div class="bar" role="img" aria-label="Crowd forecast: ${p}% ${esc(answer(c, 0))}, ${100 - p}% ${esc(answer(c, 1))}"><div class="y" style="width:${Math.min(Math.max(p, 24), 76)}%">${p >= 30 ? `<span class="lbl">${esc(answer(c, 0))}</span>` : ''}<b>${p}%</b></div><div class="n">${100 - p >= 30 ? `<span class="lbl">${esc(answer(c, 1))}</span>` : ''}<b>${100 - p}%</b></div></div>`
       : `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`}
     <div class="call-foot"><span>${total ? `${total} ${total === 1 ? 'person' : 'people'} called it · ` : ''}${when}</span>
       <button class="cmt-btn" data-act="comments" data-id="${c.id}" aria-label="${c.comments} comments">${BUBBLE}${c.comments || 'Comment'}</button></div>
@@ -190,7 +203,7 @@ function openComments(id) {
     <div class="err" id="cm-err" role="alert"></div>
     <div class="field"><label class="sr" for="cm-text">Your comment</label>
       <textarea id="cm-text" maxlength="${COMMENT_MAX}" placeholder="Add a comment…"></textarea>
-      <div class="hint">Be kind. Everyone in ${esc(COMMUNITY.name)} sees your first name. No comments about relationships, health, appearance or grades.</div></div>
+      <div class="hint">Be kind. Everyone sees your first name.</div></div>
     <button class="primary" data-act="post-comment">Post comment</button>
     <button class="secondary" data-act="close">Close</button>`);
   loadComments();
@@ -340,6 +353,7 @@ function renderHow() {
     <p class="page-sub">Forecasting, not betting. There's no money anywhere.</p>
     <div class="rules"><b>1. Make a call.</b> Pick one of the two answers (usually Yes or No) on a question about ${esc(COMMUNITY.name)}, and say how sure you are:
       ${scoringTable()}
+      <b>The crowd forecast</b> on each call averages everyone's calls, weighted by how sure they were: a Certain call moves it more than a Hunch.<br>
       <b>2. Wait for the result.</b> Calls lock at their closing time, then the E-Lab team settles them.<br>
       <b>3. Climb the table.</b> You never put points in, so you can't lose anything you own. Honest confidence scores best over a season.<br><br>
       Points can't be bought, sold or cashed out.</div>
