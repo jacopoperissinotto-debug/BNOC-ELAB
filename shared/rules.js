@@ -3,10 +3,13 @@
 // Forecasting, not staking: you never put points in. Being right earns points, scaled by confidence.
 // `level` and `hint` are what people see when picking; the numbers only appear on the Rules page.
 // `p` is how likely the person thinks their answer is: it feeds the crowd forecast.
+// The points are chosen so honesty pays: on average, Hunch scores best if you're up to ~67% sure,
+// Fairly sure between ~67% and 80%, and Certain only above 80%. (With the old +10/0, +20/-5,
+// +30/-15 table, Certain paid best for any belief above 50%, so everyone should have picked it.)
 export const CONF = {
   hunch:   { label: 'Hunch',       hint: 'Just a feeling',   level: 1, p: 0.60, pct: '60%', win: 10, lose: 0 },
-  sure:    { label: 'Fairly sure', hint: 'Pretty confident', level: 2, p: 0.75, pct: '75%', win: 20, lose: 5 },
-  certain: { label: 'Certain',     hint: 'No doubt',         level: 3, p: 0.90, pct: '90%', win: 30, lose: 15 }
+  sure:    { label: 'Fairly sure', hint: 'Pretty confident', level: 2, p: 0.75, pct: '75%', win: 15, lose: 10 },
+  certain: { label: 'Certain',     hint: 'No doubt',         level: 3, p: 0.90, pct: '90%', win: 20, lose: 30 }
 };
 
 export const COMMUNITY = { name: "King's E-Lab", short: 'KE' };

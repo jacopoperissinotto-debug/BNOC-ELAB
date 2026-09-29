@@ -323,3 +323,5 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .spark circle{fill:var(--coral)}
 .fc.early .spark path,.fc.early .spark circle{stroke:#B8AEC7;fill:none}
 .fc.early .spark circle{fill:#B8AEC7}
+.fc-locked{gap:6px;font-size:12.5px}
+.fc-locked svg{flex:none}

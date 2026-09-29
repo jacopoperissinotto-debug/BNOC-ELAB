@@ -110,8 +110,11 @@ function sparkline(trend) {
 
 // The crowd forecast as a probability: "62% chance it happens" (Yes/No questions) or
 // "71% chance of The Eagle" (custom answers: whichever answer is ahead).
+const LOCK = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+
 function forecastBlock(c) {
   if (!c.total) return `<div class="bar bar-empty">${c.status === 'open' ? 'No calls yet. Be the first!' : 'Nobody called this one'}</div>`;
+  if (c.hidden) return `<div class="bar bar-empty fc-locked">${LOCK}Make your call to see the crowd forecast</div>`;
   const yesNo = c.options[0] === 'Yes' && c.options[1] === 'No';
   const lead = yesNo || c.forecast >= 50 ? 0 : 1;
   const pct = lead === 0 ? c.forecast : 100 - c.forecast;
@@ -217,7 +220,7 @@ async function confirmCall(btn) {
   }
   S.state = data.state;
   closeSheet(); render();
-  toast(`Locked in: ${label}, ${CONF[conf].label.toLowerCase()}`);
+  toast(`Locked in: ${label}. Here's what the crowd thinks`);
 }
 
 // ---------- Comments ----------
@@ -382,9 +385,9 @@ function renderHow() {
     <p class="page-sub">Forecasting, not betting. There's no money anywhere.</p>
     <div class="rules"><b>1. Make a call.</b> Pick one of the two answers (usually Yes or No) on a question about ${esc(COMMUNITY.name)}, and say how sure you are:
       ${scoringTable()}
-      <b>The crowd forecast</b> on each call averages everyone's calls, weighted by how sure they were: a Certain call moves it more than a Hunch.<br>
+      <b>The crowd forecast</b> on each call averages everyone's calls, weighted by how sure they were: a Certain call moves it more than a Hunch. You see it once you've made your call.<br>
       <b>2. Wait for the result.</b> Calls lock at their closing time, then the E-Lab team settles them.<br>
-      <b>3. Climb the table.</b> You never put points in, so you can't lose anything you own. Honest confidence scores best over a season.<br><br>
+      <b>3. Climb the table.</b> You never put points in, so you can't lose anything you own. The points are set so that saying how sure you really are always scores best.<br><br>
       Points can't be bought, sold or cashed out.</div>
     <div class="rules"><b>House rules.</b> No calls about relationships, health, appearance or grades. Tap + to suggest a call; the E-Lab team checks every suggestion.</div>
     <button class="secondary" data-act="privacy">Privacy notice</button>`;

@@ -172,12 +172,16 @@ const callSummary = (world, c) => ({
 });
 
 // What one person sees. Other people's individual answers and emails are never sent.
+// While a call is open, its crowd forecast (and the answer counts) are only revealed to people
+// who have already made that call, so nobody just copies the crowd.
 function publicState(world, me) {
   const board = scoreboard(world);
   const calls = world.calls.filter(c => !c.void).sort(callOrder).map(c => {
     const mineF = me && world.forecasts.find(f => f.callId === c.id && f.uid === me.id && inTime(f, c));
+    const summary = callSummary(world, c);
+    if (summary.status === 'open' && !mineF) Object.assign(summary, { counts: null, forecast: null, trend: [], hidden: true });
     return {
-      ...callSummary(world, c),
+      ...summary,
       mine: mineF ? { pick: mineF.pick, conf: mineF.conf, pts: pointsFor(mineF, c) } : null
     };
   });
