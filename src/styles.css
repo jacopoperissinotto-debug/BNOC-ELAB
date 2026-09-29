@@ -295,3 +295,9 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .chal.reward{background:var(--coral)}
 .chal.reward .fine{opacity:.9}
 .chal .prize svg{color:#fff}
+.call-head{display:flex;gap:10px;align-items:flex-start}
+.call-head h3{flex:1}
+.move{display:flex;flex-direction:column;gap:4px;flex:none}
+.move button{width:34px;height:30px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:800;color:var(--plum);padding:0}
+.move button:hover:not([disabled]){border-color:var(--plum)}
+.move button[disabled]{opacity:.35;cursor:default}

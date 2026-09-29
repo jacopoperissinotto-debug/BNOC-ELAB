@@ -11,7 +11,8 @@
 //                              accounts); pid is a random id, the only one phones ever see.
 //   email/{sha(email)}         { uid }                  one account per email
 //   session/{sha(token)}       { uid }                  "this phone is logged in as…"
-//   call/{id}                  { id, q, options, closesAt, createdAt, result, settledAt, void }
+//   call/{id}                  { id, q, options, closesAt, createdAt, order, result, settledAt, void }
+//                              order: where it sits in the list (admin's ↑/↓); defaults to when it was posted
 //                              options: the two possible answers (missing = Yes/No); result: which one
 //                              happened, 0 = the first answer (Yes), 1 = the second (No)
 //   f/{callId}/{uid}           { pick, conf, at }       the answer itself; written once, never overwritten
@@ -119,12 +120,16 @@ function scoreboard(world) {
   return rows;
 }
 
+// Live calls first, then closed ones waiting for a result, then settled (newest result first).
+// Within live and closed, the admin's chosen order: new calls go to the bottom unless moved.
+const position = c => (Number.isFinite(c.order) ? c.order : Date.parse(c.createdAt));
+
 function callOrder(a, b) {
   const rank = { open: 0, closed: 1, settled: 2 };
   const sa = statusOf(a), sb = statusOf(b);
   if (sa !== sb) return rank[sa] - rank[sb];
   if (sa === 'settled') return (b.settledAt || '').localeCompare(a.settledAt || '');
-  return Date.parse(a.closesAt) - Date.parse(b.closesAt);
+  return position(a) - position(b) || a.id.localeCompare(b.id);
 }
 
 // How many people picked each answer.
@@ -382,10 +387,26 @@ async function createCall(st, body) {
   return adminState(st);
 }
 
+// Swap a call with its neighbour in the list (same group: live or closed).
+async function moveCall(st, call, direction) {
+  forget();
+  const world = await loadWorld(st);
+  const group = world.calls.filter(c => !c.void && statusOf(c) === statusOf(call)).sort(callOrder);
+  const i = group.findIndex(c => c.id === call.id);
+  const j = direction === 'up' ? i - 1 : i + 1;
+  if (i < 0 || j < 0 || j >= group.length) return adminState(st);
+  // Give every call in the group an explicit, evenly spaced position, then swap the two.
+  group.forEach((c, k) => { c.order = k; });
+  [group[i].order, group[j].order] = [group[j].order, group[i].order];
+  await Promise.all(group.map(c => st.setJSON(`call/${c.id}`, c)));
+  return adminState(st);
+}
+
 async function updateCall(st, id, body) {
   const call = await st.get(`call/${id}`, { type: 'json' });
   if (!call) return fail(404, 'Call not found.');
   const status = statusOf(call);
+  if (body.action === 'move') return moveCall(st, call, body.direction);
   switch (body.action) {
     case 'close':
       if (status !== 'open') return fail(409, 'This call is already closed.');

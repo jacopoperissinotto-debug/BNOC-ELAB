@@ -179,7 +179,12 @@ function statusChip(c) {
   return `<span class="chip won">Settled: ${esc(answer(c, c.result))}</span>`;
 }
 
-function callAdminCard(c) {
+function callAdminCard(c, i, group) {
+  // ↑/↓ reorder live (and closed) calls; settled ones sort themselves by when they were settled.
+  const mover = c.status === 'settled' ? '' : `<div class="move" role="group" aria-label="Move this call">
+      <button data-act="move" data-dir="up" data-id="${c.id}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+      <button data-act="move" data-dir="down" data-id="${c.id}" aria-label="Move down" ${i === group.length - 1 ? 'disabled' : ''}>↓</button>
+    </div>`;
   let action = '';
   if (c.status === 'open') {
     action = `<button class="settle-btn" data-act="close-call" data-id="${c.id}">Close now</button>`;
@@ -193,7 +198,7 @@ function callAdminCard(c) {
     action = `<div class="my-stake"><span>Result: <b>${esc(answer(c, c.result))}</b>. Scores updated.</span><button class="link-btn" data-act="unsettle" data-id="${c.id}">Undo</button></div>`;
   }
   return `<article class="call">
-    <h3>${esc(c.q)}</h3>
+    <div class="call-head">${mover}<h3>${esc(c.q)}</h3></div>
     <div class="chips">${statusChip(c)}</div>
     <div class="call-foot"><span><b>${c.counts[0]}</b> ${esc(answer(c, 0))} · <b>${c.counts[1]}</b> ${esc(answer(c, 1))}</span><button class="report" data-act="remove" data-id="${c.id}">Remove call</button></div>
     ${action}
@@ -206,7 +211,11 @@ function listsHtml() {
   const { calls, suggestions, people } = A.data;
   return `
     <h2 class="section-h">Calls (${calls.length})</h2>
-    ${calls.length ? calls.map(callAdminCard).join('') : '<div class="empty">No calls yet. Post the first one above.</div>'}
+    ${calls.length ? calls.map(c => {
+      const group = calls.filter(x => x.status === c.status);
+      return callAdminCard(c, group.indexOf(c), group);
+    }).join('') : '<div class="empty">No calls yet. Post the first one above.</div>'}
+    ${calls.some(c => c.status !== 'settled') ? '<p class="hint" style="margin-top:-4px">Use ↑ / ↓ to set the order people see. New calls go to the bottom.</p>' : ''}
     <h2 class="section-h">Suggestions (${suggestions.length})</h2>
     ${suggestions.length ? suggestions.map(s => `<article class="call">
         <div class="call-meta"><span><b>${esc(s.name)}</b> suggested · ${fmtWhen(s.at)}</span></div>
@@ -351,6 +360,7 @@ document.addEventListener('click', e => {
       update(b, id, 'reopen', { closesAt }, `Reopened until ${fmtWhen(closesAt)}`);
       break;
     }
+    case 'move': update(b, id, 'move', { direction: b.dataset.dir }, b.dataset.dir === 'up' ? 'Moved up' : 'Moved down'); break;
     case 'remove':
       if (confirm(`Remove "${find()?.q}"? It disappears for everyone and its points no longer count.`)) update(b, id, 'remove', {}, 'Call removed');
       break;
