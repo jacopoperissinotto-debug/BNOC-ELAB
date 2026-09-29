@@ -19,7 +19,9 @@ const S = {
   tab: 'calls',
   filter: 'live',     // 'live' | 'mine' | 'results'
   callCtx: null,      // the call being answered in the confidence sheet
-  commentsFor: null   // the call whose comments are open
+  commentsFor: null,  // the call whose comments are open
+  justCalled: new Set()  // calls answered since the app was opened: they stay on Live (showing the
+                         // revealed forecast) until the page is refreshed or reopened
 };
 let commentsTimer = null;
 
@@ -172,13 +174,14 @@ function renderCalls() {
   // Live = still open and you haven't called it yet (your to-do list); Yours = everything you've called;
   // Results = calls that have closed, whether waiting for a result or settled.
   const groups = {
-    live: all.filter(c => c.status === 'open' && !c.mine),
+    live: all.filter(c => c.status === 'open' && (!c.mine || S.justCalled.has(c.id))),
     mine: all.filter(c => c.mine),
     results: all.filter(c => c.status !== 'open')
   };
   const shown = groups[S.filter] || groups.live;
+  const todo = groups.live.filter(c => !c.mine).length;
   const f = (k, l, n) => `<button data-act="filter" data-f="${k}" aria-pressed="${S.filter === k}">${l}${n ? ` <span class="seg-count">${n}</span>` : ''}</button>`;
-  const allCalled = S.filter === 'live' && !shown.length && groups.mine.some(c => c.status === 'open');
+  const allCalled = S.filter === 'live' && !todo && groups.mine.some(c => c.status === 'open');
   const empty = allCalled
     ? `You've made every live call. <button class="link-btn" data-act="filter" data-f="mine">See yours</button>`
     : S.filter === 'live' ? 'No live calls right now. New ones are on the way.'
@@ -187,8 +190,9 @@ function renderCalls() {
   return `<h1 class="page-title">Calls</h1>
     <p class="page-sub">What's going to happen at ${esc(COMMUNITY.name)}? Make your call before it closes.</p>
     <div class="host">${KE_AVATAR}<span><b>Official community · ${S.state.people} ${S.state.people === 1 ? 'person' : 'people'}.</b> Calls are posted by the E-Lab team. Tap + to suggest one.</span></div>
-    <div class="seg" role="group" aria-label="Filter calls">${f('live', 'Live', groups.live.length)}${f('mine', 'Yours')}${f('results', 'Results')}</div>
-    ${shown.length ? shown.map(callCard).join('') : `<div class="empty">${empty}</div>`}`;
+    <div class="seg" role="group" aria-label="Filter calls">${f('live', 'Live', todo)}${f('mine', 'Yours')}${f('results', 'Results')}</div>
+    ${shown.length ? shown.map(callCard).join('') : ''}
+    ${!shown.length || (allCalled && shown.length) ? `<div class="empty">${empty}</div>` : ''}`;
 }
 
 function openCall(id, pick) {
@@ -219,6 +223,7 @@ async function confirmCall(btn) {
     return;
   }
   S.state = data.state;
+  S.justCalled.add(id);   // keep it on Live for now, showing the revealed forecast
   closeSheet(); render();
   toast(`Locked in: ${label}. Here's what the crowd thinks`);
 }

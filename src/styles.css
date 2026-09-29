@@ -325,3 +325,9 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .fc.early .spark circle{fill:#B8AEC7}
 .fc-locked{gap:6px;font-size:12.5px}
 .fc-locked svg{flex:none}
+
+/* The phone screen never scrolls itself (only .content and sheets scroll inside it), and a
+   closed sheet is fully switched off so its buttons can't hold focus off-screen. */
+.screen{overflow:clip}
+.sheet{visibility:hidden;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s linear .28s}
+.sheet.open{visibility:visible;transition:transform .28s cubic-bezier(.2,.8,.2,1),visibility 0s}

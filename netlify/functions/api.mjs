@@ -141,7 +141,7 @@ const sample = (arr, n) => arr.length <= n ? arr : Array.from({ length: n }, (_,
 // so surer calls move it more. Every call also starts with two invisible "don't know" (50%)
 // votes, so a handful of early calls nudge the forecast instead of swinging it to an extreme.
 // `forecast` is the % chance of the first answer; `trend` is how it moved from the 50% start
-// (only once 3+ people have called, smoothed to at most 12 points).
+// (from the first call, smoothed to at most 12 points). Phones only get it once they've called.
 const PRIOR_VOTES = 2;
 
 function tally(world, call) {
@@ -161,7 +161,7 @@ function tally(world, call) {
     counts,
     total: fs.length,
     forecast: fs.length ? path[path.length - 1] : null,
-    trend: fs.length >= 3 ? sample(path, 12) : []
+    trend: fs.length ? sample(path, 12) : []
   };
 }
 

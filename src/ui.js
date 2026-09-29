@@ -37,6 +37,10 @@ export function openSheet(html) {
 export function closeSheet() {
   $('#scrim').classList.remove('open');
   $('#sheet').classList.remove('open');
+  // Don't leave keyboard focus on a button in the sliding-away panel: the browser would
+  // scroll the whole screen to keep it in view.
+  if (document.activeElement?.closest('#sheet')) $('#content').focus({ preventScroll: true });
+  $('#screen').scrollTop = 0;
 }
 
 export function showError(el, msg) {
