@@ -22,8 +22,12 @@ Scoring (worked out by the back end, never the browser):
 | Confidence | Right | Wrong |
 |---|---|---|
 | Hunch (60%) | +10 | 0 |
-| Fairly sure (75%) | +20 | −5 |
-| Certain (90%) | +30 | −15 |
+| Fairly sure (75%) | +15 | −10 |
+| Certain (90%) | +20 | −30 |
+
+These numbers make honesty pay: on average, Hunch scores best if you're up to ~67% sure, Fairly sure between ~67% and 80%, and Certain only above 80%.
+
+The crowd forecast on each call is everyone's calls averaged as probabilities (Hunch 60%, Fairly sure 75%, Certain 90%), starting from two neutral 50% votes so a few early calls don't swing it. It's shown only to people who have made that call, and to everyone once it closes.
 
 Every call has exactly two answers: Yes / No by default, or two labels the admin chooses (e.g. "Team A" / "Team B"). Members can comment on any call; comments show first names, are checked for banned topics, and can be deleted by their author or an admin.
 
@@ -58,3 +62,13 @@ Admins don't have special accounts: anyone who knows `ADMIN_KEY` can open `/#/ad
 ## Privacy
 
 The in-app privacy notice (Me → Privacy notice) explains what's collected. **Delete my account** (Me tab) removes the person's name, email, login sessions, calls, suggestions and comments straight away.
+
+## Intro video
+
+`video/` makes the 60-second intro film (`~/Desktop/BNOC-intro.mp4`) from code: `intro.html` draws every frame as a function of time using the app's own styles, `render.mjs` films it frame by frame in the Chrome already on the Mac, and `encode.swift` stitches the frames into an MP4 with macOS's built-in encoder.
+
+```bash
+node video/render.mjs
+swiftc -O video/encode.swift -o video/encode
+./video/encode video/frames ~/Desktop/BNOC-intro.mp4 30
+```

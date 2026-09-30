@@ -18,3 +18,7 @@ supabase/.branches/
 # Local Netlify folder
 .netlify
 deno.lock
+
+# Video rendering output
+video/frames/
+video/encode

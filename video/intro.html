@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BNOC intro</title>
+<!-- A 60-second intro film, drawn as a web page. Every frame is a pure function of time:
+     render(t) positions everything for second t, so render.mjs can film it frame by frame. -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=block" rel="stylesheet">
+<link rel="stylesheet" href="../src/styles.css">
+<script src="qr.js"></script>
+<style>
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5}
+/* The film animates everything itself, frame by frame; the app's own CSS animations would lag behind. */
+*,*::before,*::after{transition:none!important;animation:none!important}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5;font-family:var(--body)}
+.abs{position:absolute;left:0;top:0}
+.layer{position:absolute;inset:0}
+
+/* Background decoration */
+#ring{width:1100px;height:1100px;border-radius:50%;border:3px solid rgba(255,107,74,.22)}
+#blob{width:380px;height:380px;border-radius:50%;background:rgba(127,216,190,.35)}
+#blob2{width:160px;height:160px;border-radius:50%;background:rgba(255,107,74,.18)}
+.bignum{font-family:var(--display);font-weight:800;font-size:560px;line-height:1;letter-spacing:-30px;color:transparent;-webkit-text-stroke:2px rgba(45,27,61,.07)}
+
+/* Captions */
+.cap{position:absolute}
+.kick{font:700 22px var(--body);letter-spacing:4px;color:var(--coral-dark);text-transform:uppercase;margin:0 0 18px}
+.ttl{font-family:var(--display);font-weight:800;font-size:80px;line-height:1.02;letter-spacing:-2.8px;color:var(--plum);margin:0}
+.ttl.s{font-size:66px;letter-spacing:-2.2px}
+.ln{display:block;overflow:hidden;padding-bottom:.08em;margin-bottom:-.08em}
+.ln>span{display:block}
+.sub{font:500 28px/1.45 var(--body);color:var(--muted);margin:26px 0 0;max-width:640px}
+
+/* Phone */
+#phoneWrap{width:390px;height:812px;transform-origin:195px 406px}
+#phoneWrap .phone{height:812px;box-shadow:0 60px 90px -40px rgba(45,27,61,.55)}
+.viewport{position:relative;flex:1;overflow:hidden}
+#pages{position:absolute;top:0;left:0;height:100%;width:300%;display:flex}
+#pages>.pg{width:33.3334%;height:100%;padding:4px 16px 110px;box-sizing:border-box;overflow:hidden}
+#scr .scrim{display:block;opacity:0}
+#tap{position:absolute;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;pointer-events:none}
+#tap .dotc{position:absolute;inset:0;border-radius:50%;background:rgba(255,255,255,.92);border:3px solid var(--plum);box-shadow:0 8px 20px rgba(45,27,61,.35)}
+#tap .rip{position:absolute;inset:0;border-radius:50%;border:3px solid var(--coral)}
+#rows{position:relative;height:406px}
+#rows .row{position:absolute;left:0;right:0;margin:0}
+.crown{position:absolute;right:58px;top:-14px;font-size:22px}
+
+/* Big forecast panel */
+#panel{width:960px;height:660px;border-radius:40px;background:#fff;box-shadow:0 60px 100px -50px rgba(45,27,61,.45),0 0 0 1px #E3DCEC;transform-origin:0 50%;padding:44px 48px;box-sizing:border-box}
+#panel .pm{display:flex;align-items:center;gap:12px;font-size:22px;color:var(--muted)}
+#panel .pm .avatar{width:40px;height:40px;font-size:15px}
+#panel h2{font-family:var(--display);font-weight:700;font-size:46px;line-height:1.12;letter-spacing:-1.2px;margin:18px 0 10px;color:var(--ink)}
+#panel .prow{display:flex;align-items:flex-end;gap:26px}
+#pNum{font-family:var(--display);font-weight:800;font-size:150px;line-height:.86;letter-spacing:-6px;color:var(--coral)}
+#panel .pwhat{font-size:30px;font-weight:700;color:var(--muted);padding-bottom:12px}
+#panel .plive{display:inline-flex;align-items:center;gap:10px;font-size:22px;font-weight:700;color:var(--muted);margin-bottom:12px}
+#panel .plive i{width:13px;height:13px;border-radius:50%;background:var(--mint-dark)}
+#chart{position:absolute;left:48px;bottom:78px}
+#pFoot{position:absolute;left:48px;bottom:38px;font-size:22px;color:var(--muted)}
+#pChips{position:absolute;right:48px;bottom:30px;display:flex;gap:10px}
+#pChips span{font-size:20px;font-weight:700;border-radius:999px;padding:8px 16px}
+.bub{width:40px;height:40px;border-radius:50%;margin:-20px 0 0 -20px;display:grid;place-items:center;box-shadow:0 6px 14px rgba(45,27,61,.25);border:3px solid #fff}
+.bub svg{width:20px;height:20px}
+.stamp{font-family:var(--display);font-weight:800;text-transform:uppercase;letter-spacing:2px;border-radius:20px;white-space:nowrap}
+#stamp{font-size:58px;color:var(--mint-dark);border:7px solid var(--mint-dark);background:rgba(255,255,255,.94);padding:12px 34px}
+#plus{font-family:var(--display);font-weight:800;font-size:72px;color:var(--mint-dark);-webkit-text-stroke:2px #fff;text-shadow:0 10px 24px rgba(46,142,116,.35)}
+.pt{width:14px;height:14px;border-radius:50%;margin:-7px 0 0 -7px}
+
+/* Big prize card */
+#prize{width:840px;height:540px;border-radius:44px;background:var(--coral);color:#fff;padding:58px;box-sizing:border-box;transform-origin:50% 50%;box-shadow:0 70px 110px -50px rgba(217,72,42,.8)}
+#prize .biz{display:flex;align-items:center;gap:18px;font-weight:700;font-size:30px}
+#prize .logo{width:70px;height:70px;border-radius:20px;background:rgba(255,255,255,.2);display:grid;place-items:center}
+#prize h3{font-family:var(--display);font-weight:800;font-size:74px;line-height:1.02;letter-spacing:-2px;margin:34px 0 18px}
+#prize p{font-size:30px;opacity:.95;margin:0 0 30px}
+#prize .pill{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.2);border-radius:999px;padding:12px 22px;font-size:24px;font-weight:700}
+#winStamp{font-size:54px;color:#fff;background:var(--plum);padding:18px 34px;box-shadow:0 20px 40px -10px rgba(45,27,61,.6)}
+#winStamp small{display:block;font-family:var(--body);font-size:22px;letter-spacing:1px;text-transform:none;color:var(--mint);font-weight:700;margin-top:4px}
+#tagline6{font-size:30px;font-weight:500;color:var(--muted)}
+
+/* Intro and outro */
+.full{position:absolute;inset:0}
+#intro{background:var(--plum);color:#fff}
+.mark{font-family:var(--display);font-weight:800;letter-spacing:-12px;line-height:.9;display:flex}
+.mark span{display:inline-block}
+.mark .o{color:var(--coral)}
+#outro{background:var(--plum);color:#fff}
+#qrBox{width:250px;height:250px;background:#fff;border-radius:28px;padding:18px;box-sizing:border-box}
+#qrBox svg{width:100%;height:100%;display:block}
+.chipx{display:inline-block;border-radius:999px;padding:8px 16px;font-weight:700}
+</style>
+</head>
+<body>
+<div id="stage">
+  <!-- background -->
+  <div id="ring" class="abs"></div>
+  <div id="blob" class="abs"></div>
+  <div id="blob2" class="abs"></div>
+  <div id="bigNum" class="abs bignum">01</div>
+
+  <!-- captions -->
+  <div id="cap1" class="cap" style="left:150px;top:310px;width:760px">
+    <p class="kick">01 — The feed</p>
+    <h1 class="ttl"><span class="ln"><span>Call what happens</span></span><span class="ln"><span>around you.</span></span></h1>
+    <p class="sub">Yes/no questions about life at King's E-Lab, posted by the team.</p>
+  </div>
+  <div id="cap2" class="cap" style="left:150px;top:310px;width:760px">
+    <p class="kick">02 — How sure are you?</p>
+    <h1 class="ttl"><span class="ln"><span>Say how sure</span></span><span class="ln"><span>you are.</span></span></h1>
+    <p class="sub">The surer you are, the more you win if you're right, and the more you risk if you're wrong.</p>
+  </div>
+  <div id="cap3" class="cap" style="left:840px;top:64px;width:980px">
+    <p class="kick">03 — The crowd forecast</p>
+    <h1 class="ttl s"><span class="ln"><span>Watch the crowd's odds</span></span><span class="ln"><span>move, live.</span></span></h1>
+  </div>
+  <div id="cap4" class="cap" style="left:840px;top:64px;width:980px">
+    <p class="kick">04 — Call it right</p>
+    <h1 class="ttl s"><span class="ln"><span>The result is in.</span></span><span class="ln"><span>Points land instantly.</span></span></h1>
+  </div>
+  <div id="cap5" class="cap" style="left:150px;top:310px;width:760px">
+    <p class="kick">05 — Climb the table</p>
+    <h1 class="ttl"><span class="ln"><span>Every right call</span></span><span class="ln"><span>moves you up.</span></span></h1>
+    <p class="sub">One season leaderboard for the whole community.</p>
+  </div>
+  <div id="cap6" class="cap" style="left:900px;top:64px;width:900px">
+    <p class="kick">06 — Win real prizes</p>
+    <h1 class="ttl s"><span class="ln"><span>Top the table,</span></span><span class="ln"><span>win the prize.</span></span></h1>
+  </div>
+  <div id="later" class="abs" style="font:700 24px var(--body);color:var(--coral-dark);letter-spacing:1px">A few good calls later…</div>
+
+  <!-- the phone: the app's real markup and styles -->
+  <div id="phoneWrap" class="abs">
+    <div class="phone"><div class="screen" id="scr">
+      <div class="toast" id="toast"><span class="ti">✓</span><span>Locked in: Yes. Here's what the crowd thinks</span></div>
+      <header class="top">
+        <button class="comm-btn"><span class="dot">KE</span><span class="name">King's E-Lab</span></button>
+        <div class="top-right">
+          <button class="pts-pill" id="pill"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg><span id="pts">0</span></button>
+          <button class="about-btn">?</button>
+        </div>
+      </header>
+      <div class="viewport"><div id="pages">
+        <!-- Calls -->
+        <div class="pg">
+          <h1 class="page-title">Calls</h1>
+          <p class="page-sub">What's going to happen at King's E-Lab? Make your call before it closes.</p>
+          <div class="seg"><button aria-pressed="true">Live <span class="seg-count" id="liveCount">2</span></button><button>Yours</button><button>Results</button></div>
+          <article class="call" id="c1">
+            <div class="call-meta"><span class="avatar" style="background:var(--plum)">KE</span><span><b>King's E-Lab</b> · official call</span></div>
+            <h3>Will the BNOC pitch be under 3 minutes?</h3>
+            <div class="chips" id="c1chips"><span class="chip">Result: Yes</span><span class="chip won">You called it: +20</span></div>
+            <div class="bar bar-empty fc-locked" id="c1lock"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see the crowd forecast</div>
+            <div class="fc" id="c1fc">
+              <div class="fc-top">
+                <div class="fc-main"><div><span class="fc-num" id="c1num">50%</span></div><div class="fc-sub">chance it happens</div></div>
+                <div class="fc-side"><span class="live" id="c1live"><i id="c1dotLive"></i><span id="c1liveTxt">Updated live</span></span>
+                  <svg class="spark" width="88" height="26" viewBox="0 0 88 26"><line x1="0" y1="13" x2="88" y2="13" class="mid"/><path id="c1path"/><circle id="c1end" r="2.5"/></svg></div>
+              </div>
+              <div class="meter"><i id="c1meter"></i></div>
+            </div>
+            <div class="call-foot"><span id="c1foot">10 people called it · Closes today, 23:59</span><button class="cmt-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>2</button></div>
+            <div class="vote" id="c1vote"><button class="yes" id="yesBtn">Yes</button><button class="no">No</button></div>
+            <div class="my-stake" id="c1stake"><span>You called <span class="side-tag y">Yes</span> · Certain</span><span class="my-odds pick-0" id="c1odds">58% chance</span></div>
+          </article>
+          <article class="call">
+            <div class="call-meta"><span class="avatar" style="background:var(--plum)">KE</span><span><b>King's E-Lab</b> · official call</span></div>
+            <h3>Which pub will the cohort go to after formal?</h3>
+            <div class="bar bar-empty fc-locked"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see the crowd forecast</div>
+            <div class="vote"><button class="yes">The Eagle</button><button class="no">The Bath House</button></div>
+          </article>
+        </div>
+        <!-- Ranks -->
+        <div class="pg">
+          <h1 class="page-title">Ranks</h1>
+          <p class="page-sub">Season 1 in King's E-Lab. Points land when a call is settled.</p>
+          <div class="banner"><span>★</span><span id="rkBanner"><b>You're 7th of 42.</b> Honest confidence scores best over a season.</span></div>
+          <div id="rows"></div>
+        </div>
+        <!-- Rewards -->
+        <div class="pg">
+          <h1 class="page-title">Rewards</h1>
+          <p class="page-sub">Top the King's E-Lab table to win. Free to play: nothing to buy, nothing to cash out.</p>
+          <article class="chal reward">
+            <div class="biz"><span class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11a5 5 0 0 1 10 0"/><path d="M6 11h12l-6 11z"/></svg></span>Jack's Gelato</div>
+            <h3>A free gelato from Jack's Gelato</h3>
+            <p>For whoever tops the King's E-Lab leaderboard.</p>
+            <span class="prize">★ Winner announced when the pilot ends</span>
+            <div class="chal-actions"><button>See the leaderboard</button></div>
+          </article>
+          <div class="banner"><span>★</span><span><b>You're 1st of 42</b> with 90 points. Top of the table: hold on to it!</span></div>
+        </div>
+      </div></div>
+      <nav class="nav" id="nav">
+        <button data-tab="calls"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Calls</button>
+        <button data-tab="ranks"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Ranks</button>
+        <button class="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button data-tab="rewards"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8c-2-4-6-4-6-1.5S10 8 12 8zm0 0c2-4 6-4 6-1.5S14 8 12 8z"/></svg>Rewards</button>
+        <button data-tab="me"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Me</button>
+      </nav>
+      <div class="scrim" id="scrim"></div>
+      <div class="sheet" id="sheet" style="visibility:visible">
+        <div class="grab"></div>
+        <p class="sheet-q">Will the BNOC pitch be under 3 minutes?</p>
+        <h2>You're calling <span class="side-tag y">Yes</span></h2>
+        <p class="lead">How sure are you?</p>
+        <div class="conf">
+          <button id="cf0"><span class="dots"><i class="on"></i><i></i><i></i></span><b>Hunch</b><span>Just a feeling</span></button>
+          <button id="cf1"><span class="dots"><i class="on"></i><i class="on"></i><i></i></span><b>Fairly sure</b><span>Pretty confident</span></button>
+          <button id="cf2"><span class="dots"><i class="on"></i><i class="on"></i><i class="on"></i></span><b>Certain</b><span>No doubt</span></button>
+        </div>
+        <p class="conf-note">The surer you are, the more you win if you're right, and the more you risk if you're wrong.</p>
+        <button class="primary" id="lockBtn">Lock in my call</button>
+        <button class="secondary">Cancel</button>
+      </div>
+    </div></div>
+    <div id="tap"><div class="rip" id="rip"></div><div class="dotc" id="tapDot"></div></div>
+  </div>
+
+  <!-- big live forecast panel -->
+  <div id="panel" class="abs">
+    <div class="pm"><span class="avatar" style="background:var(--plum)">KE</span><span><b style="color:var(--ink)">King's E-Lab</b> · official call</span></div>
+    <h2>Will the BNOC pitch be under 3 minutes?</h2>
+    <div class="prow">
+      <span id="pNum">50%</span>
+      <div><div class="plive" id="pLive"><i id="pDot"></i><span id="pLiveTxt">Updated live</span></div><div class="pwhat">chance it happens</div></div>
+    </div>
+    <svg id="chart" width="864" height="250" viewBox="0 0 864 250">
+      <defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#FF6B4A" stop-opacity=".28"/><stop offset="1" stop-color="#FF6B4A" stop-opacity="0"/></linearGradient></defs>
+      <line x1="0" x2="864" y1="176" y2="176" stroke="#E3DCEC" stroke-width="2" stroke-dasharray="8 8"/>
+      <text x="864" y="166" text-anchor="end" font-size="18" font-weight="700" fill="#B8AEC7" font-family="DM Sans">50%</text>
+      <path id="area" fill="url(#fill)"/>
+      <path id="line" fill="none" stroke="#FF6B4A" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle id="lineEnd" r="11" fill="#FF6B4A" stroke="#fff" stroke-width="4"/>
+    </svg>
+    <div id="pFoot">10 people called it · Closes today, 23:59</div>
+    <div id="pChips"><span style="background:#DDF4EC;color:#1F6B55">15 of 19 called it right</span><span style="background:var(--plum-soft);color:var(--plum)">Points added to the table</span></div>
+    <div id="bubbles"></div>
+    <div id="stamp" class="abs stamp">It happened · Yes</div>
+  </div>
+  <div id="plus" class="abs">+20</div>
+
+  <!-- big prize card -->
+  <div id="prize" class="abs">
+    <div class="biz"><span class="logo"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11a5 5 0 0 1 10 0"/><path d="M6 11h12l-6 11z"/></svg></span>Jack's Gelato</div>
+    <h3>A free gelato from Jack's Gelato</h3>
+    <p>For whoever tops the King's E-Lab leaderboard.</p>
+    <span class="pill">★ Winner announced when the pilot ends</span>
+  </div>
+  <div id="winStamp" class="abs stamp">Winner<small>Sam · 1st of 42 · 90 points</small></div>
+  <div id="tagline6" class="abs">Free to play. No money, nothing to buy. Just call it right.</div>
+
+  <div id="particles"></div>
+
+  <!-- transitions -->
+  <div id="band1" class="abs" style="width:2900px;height:2400px;background:var(--coral)"></div>
+  <div id="band2" class="abs" style="width:2900px;height:2400px;background:var(--plum)"></div>
+
+  <div id="intro" class="full">
+    <div id="introMark" class="mark abs" style="font-size:300px;width:1920px;justify-content:center"><span>B</span><span>N</span><span class="o">O</span><span>C</span></div>
+    <div id="introFull" class="abs" style="font:500 40px var(--body);color:#CFC2DE;width:1920px;text-align:center">Big Name On Campus</div>
+    <div id="introTag" class="abs" style="font:700 54px var(--display);color:var(--mint);letter-spacing:-1px;width:1920px;text-align:center">Call what happens around you.</div>
+  </div>
+  <div id="wipeCoral" class="full" style="background:var(--coral)"></div>
+  <div id="wipeLav" class="full" style="background:#EFEAF5"></div>
+
+  <div id="outro" class="full">
+    <div id="outMark" class="mark abs" style="font-size:230px;width:1920px;justify-content:center"><span>B</span><span>N</span><span class="o">O</span><span>C</span></div>
+    <div id="outTag" class="abs" style="font:700 58px var(--display);color:var(--mint);letter-spacing:-1.5px;width:1920px;text-align:center">Call it. Show up. Top the table.</div>
+    <div id="outQr" class="abs" style="display:flex;align-items:center;justify-content:center;gap:34px;width:1920px">
+      <div id="qrBox"></div>
+      <div><div style="font:800 56px var(--display);letter-spacing:-1.5px">bnoc.netlify.app</div>
+        <div style="font:500 28px var(--body);color:#CFC2DE;margin-top:8px">Scan to join with your Cambridge email</div></div>
+    </div>
+    <div id="outSmall" class="abs" style="font:500 24px var(--body);color:#CFC2DE;letter-spacing:.5px;width:1920px;text-align:center">Free to play · No money, ever · King's E-Lab pilot</div>
+  </div>
+  <div id="fadeOut" class="full" style="background:#1A1024;opacity:0"></div>
+</div>
+
+<script>
+window.DURATION = 60;
+const $ = id => document.getElementById(id);
+
+// ---------- timing helpers ----------
+const clamp = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const E = {
+  lin: x => x,
+  out: x => 1 - Math.pow(1 - x, 3),
+  in: x => x * x * x,
+  io: x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2,
+  expo: x => x >= 1 ? 1 : 1 - Math.pow(2, -10 * x),
+  expoIo: x => x <= 0 ? 0 : x >= 1 ? 1 : x < .5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2,
+  back: x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+};
+const P = (t, a, b, e = E.io) => e(clamp((t - a) / (b - a)));
+const L = (a, b, p) => a + (b - a) * p;
+// Visible between a and b, fading in/out over the given durations.
+const env = (t, a, b, fin = .5, fout = .5) => Math.min(P(t, a, a + fin, E.out), 1 - P(t, b - fout, b, E.in));
+function keyframes(t, frames) {
+  if (t <= frames[0].t) return frames[0];
+  for (let i = 0; i < frames.length - 1; i++) {
+    const a = frames[i], b = frames[i + 1];
+    if (t <= b.t) {
+      const p = P(t, a.t, b.t, b.e || E.io), o = {};
+      for (const k in b) if (k !== 't' && k !== 'e') o[k] = L(a[k], b[k], p);
+      return o;
+    }
+  }
+  return frames[frames.length - 1];
+}
+const S = (el, css) => Object.assign(el.style, css);
+const show = (el, on) => { el.style.display = on ? '' : 'none'; };
+
+// Smooth curve through points (Catmull-Rom), the same shape the app draws.
+function curve(pts) {
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    d += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+// ---------- story data ----------
+const HISTORY = [50, 53, 51, 55, 58];              // the forecast before you (revealed when you call)
+const INCOMING = [61, 64, 60, 66, 69, 67, 71, 70]; // new calls arriving while you watch
+const T_IN = k => 18.6 + k * .85;
+const BUB_COLORS = ['#2E8E74', '#8A4FBF', '#4B6CB7', '#D9482A', '#B5487A', '#2D1B3D', '#2E8E74', '#8A4FBF'];
+
+function forecastPoints(t) {
+  const pts = HISTORY.slice();
+  for (let k = 0; k < INCOMING.length; k++) {
+    const f = P(t, T_IN(k) - .35, T_IN(k) + .25, E.io);
+    if (f <= 0) break;
+    pts.push(L(pts[pts.length - 1], INCOMING[k], f));
+    if (f < 1) break;
+  }
+  return pts;
+}
+const arrived = t => INCOMING.filter((_, k) => t >= T_IN(k)).length;
+
+const PEOPLE = [
+  { n: 'Hannah', c: '#FF6B4A', a: 70, b: 75 }, { n: 'Mark', c: '#2E8E74', a: 65, b: 70 },
+  { n: 'Priya', c: '#8A4FBF', a: 60, b: 60 }, { n: 'Tom', c: '#4B6CB7', a: 55, b: 45 },
+  { n: 'Grace', c: '#B5487A', a: 40, b: 50 }, { n: 'Utsav', c: '#D9482A', a: 30, b: 30 },
+  { n: 'Sam (you)', c: '#2D1B3D', a: 20, b: 90, me: true }
+];
+
+// Particle bursts (fixed "random" directions so every render is identical).
+const BURSTS = [
+  { t: 27.15, x: 1330, y: 740, n: 34 },   // result stamp
+  { t: 39.8, x: 1330, y: 400, n: 26 },    // reaching 1st
+  { t: 47.55, x: 1600, y: 330, n: 34 }    // winner stamp
+];
+const PCOLORS = ['#FF6B4A', '#7FD8BE', '#2D1B3D', '#FFC857', '#8A4FBF'];
+
+// ---------- one-time setup ----------
+let TAP = {};
+function init() {
+  $('qrBox').innerHTML = window.QR_SVG;
+  // leaderboard rows
+  $('rows').innerHTML = PEOPLE.map((p, i) => `<div class="row ${p.me ? 'me' : ''}" id="row${i}"><span class="rank" id="rk${i}">${i + 1}</span><span class="avatar" style="background:${p.c}">${p.n[0]}</span><span class="who">${p.n}</span><span class="sc" id="sc${i}">${p.a}</span></div>`).join('');
+  // incoming-call bubbles (anonymous: the app never shows who called what)
+  $('bubbles').innerHTML = INCOMING.map((_, k) => `<div class="bub abs" id="bub${k}" style="background:${BUB_COLORS[k]}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>`).join('');
+  // particles
+  $('particles').innerHTML = BURSTS.map((b, bi) => Array.from({ length: b.n }, (_, i) =>
+    `<div class="pt abs" id="p${bi}_${i}" style="background:${PCOLORS[(i * 7 + bi) % PCOLORS.length]};${i % 3 === 0 ? 'border-radius:3px' : ''}"></div>`).join('')).join('');
+  // Where the tap targets are, relative to the phone, measured with the sheet open.
+  const phone = document.querySelector('#phoneWrap .phone').getBoundingClientRect();
+  const centre = el => { const r = el.getBoundingClientRect(); return [r.left - phone.left + r.width / 2, r.top - phone.top + r.height / 2]; };
+  S($('sheet'), { transform: 'none' });
+  show($('c1vote'), true);
+  TAP = { yes: centre($('yesBtn')), certain: centre($('cf2')), lock: centre($('lockBtn')) };
+  S($('sheet'), { transform: '' });
+  window.__ready = true;
+}
+
+// ---------- the timeline ----------
+window.render = function (t) {
+  // Background drift and the big faded scene number
+  S($('ring'), { transform: `translate(${1180 + 70 * Math.sin(t * .23)}px, ${-380 + 50 * Math.cos(t * .19)}px) rotate(${t * 4}deg)` });
+  S($('blob'), { transform: `translate(${-90 + 40 * Math.sin(t * .31)}px, ${780 + 36 * Math.cos(t * .27)}px)` });
+  S($('blob2'), { transform: `translate(${820 + 60 * Math.cos(t * .21)}px, ${880 + 30 * Math.sin(t * .35)}px)` });
+  const scenes = [[5.4, 9.9, '01'], [9.9, 15.6, '02'], [15.6, 26, '03'], [26, 34.6, '04'], [34.6, 43.6, '05'], [43.6, 51.6, '06']];
+  const sc = scenes.find(s => t >= s[0] && t < s[1]);
+  $('bigNum').textContent = sc ? sc[2] : '';
+  const bnOp = sc ? env(t, sc[0], sc[1], .6, .6) : 0;
+  const bnLeft = t < 15.6 || (t >= 34.6 && t < 43.6);
+  S($('bigNum'), { opacity: bnOp, transform: `translate(${bnLeft ? 90 : 1300}px, ${bnLeft ? 600 : 620}px) translateY(${(1 - bnOp) * 40}px)` });
+
+  // ----- captions: lines rise out of a mask, then drift away -----
+  const caption = (id, a, b) => {
+    const el = $(id), vis = env(t, a, b, .3, .5);
+    el.style.opacity = vis;
+    el.style.display = vis <= 0 ? 'none' : '';
+    const out = P(t, b - .5, b, E.in);
+    el.style.transform = `translateY(${-30 * out}px)`;
+    el.querySelectorAll('.ln>span').forEach((s, i) => { s.style.transform = `translateY(${(1 - P(t, a + .1 + i * .12, a + .8 + i * .12, E.expo)) * 110}%)`; });
+    const k = el.querySelector('.kick'); k.style.transform = `translateX(${(1 - P(t, a, a + .6, E.expo)) * -40}px)`;
+    const s = el.querySelector('.sub'); if (s) { s.style.opacity = P(t, a + .45, a + 1.05); s.style.transform = `translateY(${(1 - P(t, a + .45, a + 1.05, E.out)) * 16}px)`; }
+  };
+  caption('cap1', 5.8, 10.0); caption('cap2', 10.2, 15.6); caption('cap3', 16.5, 26.0);
+  caption('cap4', 26.2, 34.6); caption('cap5', 35.6, 43.4); caption('cap6', 44.4, 51.4);
+  const lat = env(t, 36.7, 43.3, .4, .4);
+  S($('later'), { opacity: lat, transform: `translate(${150 + (1 - P(t, 36.7, 37.3, E.out)) * -20}px, 690px)` });
+
+  // ----- phone position (it glides between layouts) -----
+  const ph = keyframes(t, [
+    { t: 5.4, x: 1330, y: 760, s: .86, r: -12, o: 0 },
+    { t: 6.5, x: 1330, y: 540, s: 1.08, r: 0, o: 1, e: E.out },
+    { t: 15.6, x: 1330, y: 540, s: 1.08, r: 0, o: 1 },
+    { t: 16.8, x: 460, y: 545, s: 1.0, r: 0, o: 1, e: E.expoIo },
+    { t: 34.9, x: 460, y: 545, s: 1.0, r: 0, o: 1 },
+    { t: 34.95, x: 1330, y: 540, s: 1.08, r: 0, o: 1, e: E.lin },
+    { t: 43.6, x: 1330, y: 540, s: 1.08, r: 0, o: 1 },
+    { t: 44.7, x: 470, y: 545, s: 1.0, r: 0, o: 1, e: E.expoIo }
+  ]);
+  const bob = 6 * Math.sin(t * 1.3);
+  S($('phoneWrap'), { opacity: ph.o, transform: `translate(${ph.x - 195}px, ${ph.y - 406 + bob}px) scale(${ph.s}) rotate(${ph.r}deg)`, display: t < 5.3 ? 'none' : '' });
+
+  // ----- inside the phone -----
+  const page = t < 34.95 ? 0 : t < 43.8 ? 1 : 1 + P(t, 43.8, 44.5, E.expoIo);
+  S($('pages'), { transform: `translateX(${-page * 33.3334}%)` });
+  const tab = page < .5 ? 'calls' : page < 1.5 ? 'ranks' : 'rewards';
+  document.querySelectorAll('#nav [data-tab]').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+
+  // the confidence sheet
+  const sheetUp = P(t, 9.75, 10.35, E.out) * (1 - P(t, 14.05, 14.5, E.in));
+  S($('sheet'), { transform: `translateY(${(1 - sheetUp) * 105}%)` });
+  S($('scrim'), { opacity: sheetUp });
+  const pick = t < 11.95 ? 1 : 2;
+  ['cf0', 'cf1', 'cf2'].forEach((id, i) => $(id).setAttribute('aria-pressed', String(i === pick)));
+  const lockFlash = env(t, 13.7, 14.05, .05, .2);
+  S($('lockBtn'), { transform: `scale(${1 - .04 * lockFlash})`, background: lockFlash > .3 ? 'var(--coral-dark)' : '' });
+  $('cf2').style.transform = `scale(${1 - .05 * env(t, 11.85, 12.15, .05, .2)})`;
+  $('yesBtn').style.transform = `scale(${1 - .05 * env(t, 9.45, 9.8, .05, .2)})`;
+  $('yesBtn').style.background = t > 9.5 && t < 9.9 ? 'var(--coral)' : '';
+  $('yesBtn').style.color = t > 9.5 && t < 9.9 ? '#fff' : '';
+
+  // toast
+  const toast = P(t, 14.4, 14.8, E.out) * (1 - P(t, 16.9, 17.3, E.in));
+  S($('toast'), { transform: `translateY(${(1 - toast) * -140}%)` });
+
+  // the tap "finger"
+  const tp = keyframes(t, [
+    { t: 8.3, x: 300, y: 900, o: 0 }, { t: 8.7, x: 300, y: 860, o: 1 },
+    { t: 9.35, x: TAP.yes[0], y: TAP.yes[1], o: 1 },
+    { t: 10.2, x: TAP.yes[0], y: TAP.yes[1], o: 1 }, { t: 10.5, x: 200, y: 700, o: 1 },
+    { t: 11.6, x: TAP.certain[0], y: TAP.certain[1], o: 1 },
+    { t: 12.6, x: TAP.certain[0], y: TAP.certain[1], o: 1 },
+    { t: 13.5, x: TAP.lock[0], y: TAP.lock[1], o: 1 },
+    { t: 14.05, x: TAP.lock[0], y: TAP.lock[1], o: 1 }, { t: 14.4, x: TAP.lock[0], y: TAP.lock[1] + 30, o: 0 }
+  ]);
+  const presses = [9.5, 11.9, 13.72];
+  const press = Math.max(...presses.map(p => env(t, p - .08, p + .22, .06, .16)));
+  S($('tap'), { opacity: tp.o, transform: `translate(${tp.x}px, ${tp.y}px)`, display: t < 8.3 || t > 14.5 ? 'none' : '' });
+  S($('tapDot'), { transform: `scale(${1 - .22 * press})` });
+  const rp = presses.map(p => clamp((t - p) / .55)).find(x => x > 0 && x < 1);
+  S($('rip'), { opacity: rp ? 1 - rp : 0, transform: `scale(${1 + (rp || 0) * 1.8})` });
+
+  // card 1: locked → answered (forecast revealed) → settled
+  const answered = t >= 14.5;
+  const settled = t >= 27.4;
+  show($('c1lock'), !answered);
+  show($('c1vote'), !answered);
+  show($('c1fc'), answered);
+  show($('c1stake'), answered && !settled);
+  show($('c1chips'), settled);
+  $('liveCount').textContent = answered ? '1' : '2';
+  const reveal = P(t, 14.55, 15.2, E.out);
+  S($('c1fc'), { opacity: reveal, transform: `translateY(${(1 - reveal) * 10}px)` });
+  $('c1chips').style.transform = `scale(${L(1.25, 1, P(t, 27.4, 27.8, E.back))})`;
+  $('c1chips').style.transformOrigin = '0 50%';
+
+  // the forecast itself (same numbers in the card and the big panel)
+  const pts = forecastPoints(t);
+  const draw = P(t, 14.7, 16.2, E.io);                     // reveal draw-on of the history
+  const revealNum = Math.round(L(50, HISTORY[HISTORY.length - 1], draw));
+  const liveVal = t < 18.2 ? revealNum : Math.round(pts[pts.length - 1]);
+  $('c1num').textContent = liveVal + '%';
+  $('c1odds').textContent = liveVal + '% chance';
+  $('c1meter').style.width = liveVal + '%';
+  const people = 10 + 1 + arrived(t);
+  $('c1foot').textContent = `${answered ? people : 10} people called it · ${settled ? 'Settled' : 'Closes today, 23:59'}`;
+  $('pFoot').textContent = `${people} people called it · ${t >= 26.4 ? 'Closed today, 23:59' : 'Closes today, 23:59'}`;
+  const closed = t >= 26.4;
+  $('c1liveTxt').textContent = closed ? 'Final forecast' : 'Updated live';
+  $('pLiveTxt').textContent = closed ? 'Final forecast' : 'Updated live';
+  const pulse = closed ? 0 : .35 + .65 * (.5 + .5 * Math.cos(t * 3.5));
+  S($('c1dotLive'), { opacity: pulse, display: closed ? 'none' : '' });
+  S($('pDot'), { opacity: pulse, display: closed ? 'none' : '' });
+
+  // small sparkline in the card
+  const sp = t < 18.2 ? HISTORY.slice(0, Math.max(2, Math.ceil(draw * HISTORY.length))) : pts;
+  const sPts = sp.map((v, i) => [3 + i / (sp.length - 1) * 82, 3 + (1 - v / 100) * 20]);
+  $('c1path').setAttribute('d', curve(sPts));
+  const se = sPts[sPts.length - 1];
+  $('c1end').setAttribute('cx', se[0]); $('c1end').setAttribute('cy', se[1]);
+
+  // ----- the big panel -----
+  const panIn = P(t, 16.2, 17.2, E.expo);
+  const panOut = P(t, 34.35, 34.9, E.in);
+  S($('panel'), {
+    display: t < 16.1 || t > 34.95 ? 'none' : '',
+    opacity: panIn * (1 - panOut),
+    transform: `translate(${840 + panOut * 120}px, 300px) scale(${L(.72, 1, panIn)}) perspective(1600px) rotateY(${(1 - panIn) * -18}deg)`
+  });
+  $('pNum').textContent = (t < 16.8 ? 50 : t < 18.2 ? Math.round(L(50, 58, P(t, 16.8, 18.0, E.io))) : liveVal) + '%';
+  const W = 864, H = 250, pad = 16;
+  const draw2 = P(t, 16.8, 18.0, E.io);
+  const cp = t < 18.2 ? HISTORY : pts;
+  const n = cp.length;
+  const yOf = v => pad + (1 - (v - 44) / 32) * (H - 2 * pad);
+  const xy = cp.map((v, i) => [pad + i / (n - 1) * (W - 2 * pad), yOf(v)]);
+  // draw-on: clip the line to the reveal progress
+  const cut = t < 18.2 ? draw2 : 1;
+  const upto = Math.max(1, cut * (n - 1));
+  const whole = Math.floor(upto), frac = upto - whole;
+  const vis = xy.slice(0, whole + 1);
+  if (frac > 0 && whole < n - 1) vis.push([L(xy[whole][0], xy[whole + 1][0], frac), L(xy[whole][1], xy[whole + 1][1], frac)]);
+  const dLine = curve(vis.length > 1 ? vis : [xy[0], xy[0]]);
+  $('line').setAttribute('d', dLine);
+  const last = vis[vis.length - 1];
+  $('area').setAttribute('d', `${dLine} L${last[0].toFixed(1)},${H} L${pad},${H} Z`);
+  $('lineEnd').setAttribute('cx', last[0]); $('lineEnd').setAttribute('cy', last[1]);
+  $('lineEnd').setAttribute('r', 11 + 5 * Math.max(0, ...INCOMING.map((_, k) => env(t, T_IN(k) - .05, T_IN(k) + .35, .05, .3))));
+
+  // incoming calls fly into the end of the line
+  INCOMING.forEach((_, k) => {
+    const a = T_IN(k) - .75, b = T_IN(k);
+    const f = P(t, a, b, E.io), gone = P(t, b, b + .25, E.in);
+    const from = [[900, -60], [980, 120], [900, 520], [620, 640], [1000, 360], [760, -80], [1000, 560], [560, -70]][k];
+    const end = [48 + last[0], 660 - 78 - H + last[1]];
+    const el = $('bub' + k);
+    const vis = t > a && t < b + .25;
+    S(el, { display: vis ? '' : 'none', transform: `translate(${L(from[0], end[0], f)}px, ${L(from[1], end[1], f) - Math.sin(f * Math.PI) * 60}px) scale(${(1 - gone) * L(.6, 1, f)})`, opacity: 1 - gone });
+  });
+  $('pChips').style.opacity = P(t, 29.4, 30.0, E.out);
+  $('pChips').style.transform = `translateY(${(1 - P(t, 29.4, 30.0, E.out)) * 16}px)`;
+
+  // result stamp
+  const st = P(t, 27.0, 27.4, E.out);
+  S($('stamp'), { display: t < 27 ? 'none' : '', opacity: st, transform: `translate(200px, 380px) rotate(${L(-20, -8, st)}deg) scale(${L(2.2, 1, st)})` });
+
+  // +20 flies from the stamp to your score in the phone
+  const fl = P(t, 27.9, 28.9, E.io);
+  const pillX = 460 + (313 - 195) * 1.0, pillY = 545 + (66 - 406) * 1.0;
+  S($('plus'), { display: t < 27.8 || t > 29.1 ? 'none' : '', opacity: env(t, 27.8, 29.1, .15, .2),
+    transform: `translate(${L(455 - 65, pillX - 65, fl) + Math.sin(fl * Math.PI) * 70}px, ${L(497 - 40, pillY - 40, fl)}px) scale(${L(1.1, .4, fl)})` });
+  const ptsVal = t < 28.9 ? 0 : t < 37.6 ? 20 : Math.round(L(20, 90, P(t, 37.6, 39.8, E.io)));
+  $('pts').textContent = ptsVal;
+  const bounce = Math.max(env(t, 28.9, 29.4, .08, .4), env(t, 39.8, 40.3, .08, .4));
+  S($('pill'), { transform: `scale(${1 + .25 * bounce})`, background: bounce > .2 ? 'var(--mint-dark)' : '' });
+
+  // ----- leaderboard reshuffle -----
+  const rs = P(t, 38.0, 39.8, E.io), tick = P(t, 37.6, 39.8, E.io);
+  const before = PEOPLE.map((p, i) => i);
+  const afterOrder = PEOPLE.map((p, i) => i).sort((a, b) => PEOPLE[b].b - PEOPLE[a].b);
+  PEOPLE.forEach((p, i) => {
+    const r0 = before.indexOf(i), r1 = afterOrder.indexOf(i);
+    const y = L(r0, r1, rs) * 58;
+    const score = Math.round(L(p.a, p.b, tick));
+    $('sc' + i).textContent = score;
+    $('rk' + i).textContent = (rs < .5 ? r0 : r1) + 1;
+    S($('row' + i), { transform: `translateY(${y}px) ${p.me ? `scale(${1 + .04 * Math.sin(rs * Math.PI)})` : ''}`, zIndex: p.me ? 5 : 1 });
+  });
+  $('rkBanner').innerHTML = t < 39.6 ? '<b>You\'re 7th of 42.</b> Honest confidence scores best over a season.' : '<b>You\'re 1st of 42.</b> Top of the table: hold on to it!';
+
+  // ----- the prize card -----
+  const pz = P(t, 45.0, 46.2, E.expo);
+  S($('prize'), { display: t < 44.9 ? 'none' : '', opacity: clamp(pz * 1.4),
+    transform: `translate(900px, 300px) perspective(1800px) rotateY(${(1 - pz) * 75}deg) rotateZ(${(1 - pz) * -4}deg) scale(${L(.8, 1, pz)})` });
+  const ws = P(t, 47.35, 47.75, E.out);
+  S($('winStamp'), { display: t < 47.3 ? 'none' : '', opacity: ws, transform: `translate(1420px, 250px) rotate(${L(-18, 6, ws)}deg) scale(${L(2.4, 1, ws)})` });
+  const tg = P(t, 48.6, 49.3, E.out);
+  S($('tagline6'), { opacity: tg * (t < 51.4 ? 1 : 0), transform: `translate(900px, ${880 + (1 - tg) * 16}px)` });
+
+  // ----- particle bursts -----
+  BURSTS.forEach((b, bi) => {
+    for (let i = 0; i < b.n; i++) {
+      const el = $(`p${bi}_${i}`);
+      const f = (t - b.t) / 1.4;
+      if (f <= 0 || f >= 1) { el.style.display = 'none'; continue; }
+      const ang = (i / b.n) * Math.PI * 2 + (i % 4) * .3;
+      const dist = (160 + ((i * 53) % 140)) * E.out(f);
+      const grav = 180 * f * f;
+      S(el, { display: '', opacity: 1 - E.in(f), transform: `translate(${b.x + Math.cos(ang) * dist}px, ${b.y + Math.sin(ang) * dist + grav}px) rotate(${f * 400 + i * 20}deg) scale(${1 - .4 * f})` });
+    }
+  });
+
+  // ----- diagonal band wipe between scenes 4 and 5 -----
+  const b1 = P(t, 34.3, 35.5, E.expoIo), b2 = P(t, 34.42, 35.62, E.expoIo);
+  S($('band1'), { display: t > 34.2 && t < 35.7 ? '' : 'none', transform: `translate(${L(-3100, 2200, b1)}px, -600px) rotate(24deg)` });
+  S($('band2'), { display: t > 34.3 && t < 35.8 ? '' : 'none', transform: `translate(${L(-3100, 2200, b2)}px, -600px) rotate(24deg)` });
+
+  // ----- intro -----
+  const introOn = t < 5.5;
+  show($('intro'), introOn);
+  if (introOn) {
+    const letters = $('introMark').children;
+    const mw = 300 * 2.35;
+    S($('introMark'), { transform: 'translate(0px, 300px)' });
+    [...letters].forEach((l, i) => {
+      const f = P(t, .3 + i * .15, 1.1 + i * .15, E.back);
+      S(l, { transform: `translateY(${(1 - f) * 160}px) rotate(${(1 - f) * (i % 2 ? 10 : -10)}deg)`, opacity: clamp(f * 1.5) });
+    });
+    const f1 = P(t, 1.3, 2.0, E.out), f2 = P(t, 2.0, 2.8, E.out);
+    S($('introFull'), { opacity: f1, transform: `translate(0px, ${620 + (1 - f1) * 20}px)` });
+    S($('introTag'), { opacity: f2, transform: `translate(0px, ${700 + (1 - f2) * 24}px)` });
+  }
+  const wc = P(t, 4.1, 4.9, E.expoIo), wl = P(t, 4.55, 5.35, E.expoIo);
+  S($('wipeCoral'), { display: t > 4.05 && t < 5.4 ? '' : 'none', clipPath: `circle(${wc * 2300}px at 1075px 450px)` });
+  S($('wipeLav'), { display: t > 4.5 && t < 5.4 ? '' : 'none', clipPath: `circle(${wl * 2300}px at 1075px 450px)` });
+
+  // ----- outro -----
+  const wo = P(t, 51.3, 52.3, E.expoIo);
+  S($('outro'), { display: t > 51.25 ? '' : 'none', clipPath: `circle(${wo * 2400}px at 1320px 570px)` });
+  if (t > 51.25) {
+    const letters = $('outMark').children, mw = 230 * 2.35;
+    S($('outMark'), { transform: 'translate(0px, 170px)' });
+    [...letters].forEach((l, i) => {
+      const f = P(t, 52.2 + i * .12, 52.9 + i * .12, E.back);
+      S(l, { transform: `translateY(${(1 - f) * 120}px)`, opacity: clamp(f * 1.5) });
+    });
+    const a = P(t, 53.2, 53.9, E.out), b = P(t, 53.9, 54.7, E.expo), c = P(t, 54.6, 55.3, E.out);
+    S($('outTag'), { opacity: a, transform: `translate(0px, ${440 + (1 - a) * 24}px)` });
+    S($('outQr'), { opacity: b, transform: `translate(0px, ${580 + (1 - b) * 40}px)` });
+    S($('outSmall'), { opacity: c, transform: `translate(0px, ${920 + (1 - c) * 12}px)` });
+  }
+  $('fadeOut').style.opacity = P(t, 59.3, 60, E.in);
+};
+
+document.fonts.ready.then(() => { init(); render(0); });
+</script>
+</body>
+</html>
