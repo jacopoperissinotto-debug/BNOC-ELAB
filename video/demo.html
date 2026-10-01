@@ -44,6 +44,19 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
 #rows{position:relative;height:406px}
 #rows .row{position:absolute;left:0;right:0;margin:0}
 
+/* Sign-in screen (the first thing the demo shows) */
+#gate{position:absolute;inset:0;z-index:30;background:var(--plum);color:#fff;display:flex;flex-direction:column;padding:92px 26px 30px}
+#gate .gmark{font-family:var(--display);font-weight:800;font-size:76px;letter-spacing:-3px;line-height:.9}
+#gate .gmark span{color:var(--coral)}
+#gate .gsub{font-size:17px;color:#CFC2DE;margin:10px 0 34px}
+#gate label{font-weight:700;font-size:14px;margin:0 0 6px;color:#CFC2DE}
+#gate .gin{height:50px;border-radius:14px;background:#fff;color:var(--ink);font-size:16px;display:flex;align-items:center;padding:0 14px;margin-bottom:16px}
+#gate .gin i{display:inline-block;width:2px;height:18px;background:var(--coral);margin-left:1px}
+#gate .primary{margin-top:10px}
+#gate .gfine{font-size:13px;color:#CFC2DE;text-align:center;margin:16px 0 0}
+#tapL{position:absolute;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;pointer-events:none;z-index:61}
+#tapL .dotc{position:absolute;inset:0;border-radius:50%;background:rgba(255,255,255,.92);border:3px solid var(--plum);box-shadow:0 8px 20px rgba(45,27,61,.35)}
+
 /* Communities list (new screen) */
 .comm{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:9px}
 .comm .avatar{width:40px;height:40px;font-size:14px;font-family:var(--display);font-weight:800}
@@ -113,6 +126,11 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
   <div id="bigNum" class="abs bignum">01</div>
 
   <!-- captions -->
+  <div id="cap0" class="cap" style="left:150px;top:300px;width:800px">
+    <p class="kick">Start — Join</p>
+    <h1 class="ttl"><span class="ln"><span>Join in</span></span><span class="ln"><span>seconds.</span></span></h1>
+    <p class="sub">Your first name and your university email. Nothing to pay.</p>
+  </div>
   <div id="cap1" class="cap" style="left:150px;top:300px;width:800px">
     <p class="kick">01 — Communities</p>
     <h1 class="ttl"><span class="ln"><span>Pick your</span></span><span class="ln"><span>community.</span></span></h1>
@@ -139,6 +157,14 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
   <!-- the phone: the app's real markup and styles, plus two screens that are next on the roadmap -->
   <div id="phoneWrap" class="abs">
     <div class="phone"><div class="screen" id="scr">
+      <div id="gate">
+        <div class="gmark">BN<span>O</span>C</div>
+        <p class="gsub">Call what happens around you.</p>
+        <label>First name</label><div class="gin"><span id="gName"></span><i id="gNameC"></i></div>
+        <label>University email</label><div class="gin"><span id="gMail"></span><i id="gMailC"></i></div>
+        <button class="primary" id="gJoin">Join</button>
+        <p class="gfine">Free to play. No money, ever.</p>
+      </div>
       <div class="toast" id="toast"><span class="ti">✓</span><span id="toastTxt">Approved by the organisers: your call is live</span></div>
       <header class="top">
         <button class="comm-btn"><span class="dot" id="commDot">+</span><span class="name" id="commName">Choose a community</span></button>
@@ -255,6 +281,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
       </div>
     </div></div>
     <div id="tap"><div class="rip" id="rip"></div><div class="dotc" id="tapDot"></div></div>
+    <div id="tapL"><div class="dotc" id="tapLDot"></div></div>
   </div>
 
   <!-- big live odds panel -->
@@ -300,7 +327,8 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
 </div>
 
 <script>
-window.DURATION = 45;
+const OFF = 2.2;                 // the sign-in at the start; everything else is timed after it
+window.DURATION = 45 + OFF;
 const $ = id => document.getElementById(id);
 
 // ---------- timing helpers ----------
@@ -396,6 +424,7 @@ function init() {
   const open = id => sheets.forEach(s => { $(s).style.transform = s === id ? 'none' : 'translateY(105%)'; });
   S($('phoneWrap'), { transform: 'none' });
   open(null);
+  TAP.join = centre($('gJoin'));
   page(0); TAP.comm = centre($('cm0')); TAP.fab = centre($('fab'));
   open('sgSheet'); TAP.send = centre($('sendBtn'));
   open(null); page(1); $('c0wrap').style.height = ''; show($('c1chips'), false); show($('c1fc'), false); show($('c1stake'), false);
@@ -408,6 +437,29 @@ function init() {
 
 // ---------- the timeline ----------
 window.render = function (t) {
+  const T = t;                    // real time; t below is time since the sign-in finished
+  t = Math.max(0, T - OFF);
+
+  // ----- sign-in: name and email are typed, Join is tapped, the screen lifts away -----
+  const NAME = 'Sam', MAIL = 'sam@cam.ac.uk';
+  $('gName').textContent = NAME.slice(0, Math.round(NAME.length * P(T, .35, .7, E.lin)));
+  $('gMail').textContent = MAIL.slice(0, Math.round(MAIL.length * P(T, .8, 1.5, E.lin)));
+  show($('gNameC'), T < .75);
+  show($('gMailC'), T >= .75 && T < 1.7);
+  const joinFlash = env(T, 1.85, 2.2, .05, .2);
+  S($('gJoin'), { transform: `scale(${1 - .04 * joinFlash})`, background: joinFlash > .3 ? 'var(--coral-dark)' : '' });
+  const gateOut = P(T, 2.05, 2.55, E.in);
+  S($('gate'), { display: T > 2.6 ? 'none' : 'flex', transform: `translateY(${-gateOut * 100}%)`, opacity: 1 - gateOut * .4 });
+  const tl = keyframes(T, [{ t: 1.2, x: 300, y: 720, o: 0 }, { t: 1.45, x: 300, y: 700, o: 1 }, { t: 1.85, x: TAP.join[0], y: TAP.join[1], o: 1 }, { t: 2.1, x: TAP.join[0], y: TAP.join[1], o: 1 }, { t: 2.35, x: TAP.join[0], y: TAP.join[1] - 20, o: 0 }]);
+  S($('tapL'), { opacity: tl.o, transform: `translate(${tl.x}px, ${tl.y}px)`, display: tl.o <= 0 ? 'none' : '' });
+  S($('tapLDot'), { transform: `scale(${1 - .22 * env(T, 1.82, 2.12, .06, .16)})` });
+  {
+    const el = $('cap0'), vis = env(T, .15, 2.5, .3, .4);
+    el.style.opacity = vis; el.style.display = vis <= 0 ? 'none' : '';
+    el.querySelectorAll('.ln>span').forEach((sp, i) => { sp.style.transform = `translateY(${(1 - P(T, .2 + i * .1, .75 + i * .1, E.expo)) * 110}%)`; });
+    el.querySelector('.sub').style.opacity = P(T, .5, 1.0);
+  }
+
   // Background drift and the big faded scene number
   S($('ring'), { transform: `translate(${1180 + 70 * Math.sin(t * .23)}px, ${-380 + 50 * Math.cos(t * .19)}px) rotate(${t * 4}deg)` });
   S($('blob'), { transform: `translate(${-90 + 40 * Math.sin(t * .31)}px, ${780 + 36 * Math.cos(t * .27)}px)` });
@@ -434,11 +486,11 @@ window.render = function (t) {
   caption('cap4', 25.8, 35.0); caption('cap5', 35.4, 99);
 
   // ----- phone position (it glides between layouts) -----
-  const ph = keyframes(t, [
-    { t: 0, x: 1330, y: 760, s: .86, r: -12, o: 0 },
-    { t: 1.0, x: 1330, y: 540, s: 1.08, r: 0, o: 1, e: E.out },
-    { t: 14.5, x: 1330, y: 540, s: 1.08, r: 0, o: 1 },
-    { t: 15.7, x: 460, y: 545, s: 1.0, r: 0, o: 1, e: E.expoIo }
+  const ph = keyframes(T, [
+    { t: 0, x: 1330, y: 700, s: .92, r: -8, o: 0 },
+    { t: .45, x: 1330, y: 540, s: 1.08, r: 0, o: 1, e: E.out },
+    { t: 14.5 + OFF, x: 1330, y: 540, s: 1.08, r: 0, o: 1 },
+    { t: 15.7 + OFF, x: 460, y: 545, s: 1.0, r: 0, o: 1, e: E.expoIo }
   ]);
   const bob = 6 * Math.sin(t * 1.3);
   S($('phoneWrap'), { opacity: ph.o, transform: `translate(${ph.x - 195}px, ${ph.y - 406 + bob}px) scale(${ph.s}) rotate(${ph.r}deg)` });
@@ -658,7 +710,7 @@ window.render = function (t) {
 
 // ---------- live playback (the pitch page calls these) ----------
 // The demo is five scenes. STOPS are the moments each one comes to rest, so a presenter can click through them.
-window.STOPS = [6.0, 14.0, 25.0, 34.3, 45];
+window.STOPS = [6.0, 14.0, 25.0, 34.3, 45].map(x => x + OFF);
 let raf = 0, t0 = 0, target = 0;
 window.__playing = false;
 window.playRange = function (from, to) {
