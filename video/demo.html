@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BNOC demo</title>
+<!-- A 45-second product demo for the pitch, drawn as a web page in the same style as intro.html.
+     Every frame is a pure function of time: render(t). play() runs it live; the pitch page embeds it. -->
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../src/styles.css">
+<script src="qr.js"></script>
+<style>
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5}
+/* The demo animates everything itself, frame by frame; the app's own CSS animations would lag behind. */
+*,*::before,*::after{transition:none!important;animation:none!important}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5;font-family:var(--body)}
+.abs{position:absolute;left:0;top:0}
+
+/* Background decoration */
+#ring{width:1100px;height:1100px;border-radius:50%;border:3px solid rgba(255,107,74,.22)}
+#blob{width:380px;height:380px;border-radius:50%;background:rgba(127,216,190,.35)}
+#blob2{width:160px;height:160px;border-radius:50%;background:rgba(255,107,74,.18)}
+.bignum{font-family:var(--display);font-weight:800;font-size:560px;line-height:1;letter-spacing:-30px;color:transparent;-webkit-text-stroke:2px rgba(45,27,61,.07)}
+
+/* Captions */
+.cap{position:absolute}
+.kick{font:700 22px var(--body);letter-spacing:4px;color:var(--coral-dark);text-transform:uppercase;margin:0 0 18px}
+.ttl{font-family:var(--display);font-weight:800;font-size:80px;line-height:1.02;letter-spacing:-2.8px;color:var(--plum);margin:0}
+.ttl.s{font-size:66px;letter-spacing:-2.2px}
+.ln{display:block;overflow:hidden;padding-bottom:.08em;margin-bottom:-.08em}
+.ln>span{display:block}
+.sub{font:500 28px/1.45 var(--body);color:var(--muted);margin:26px 0 0;max-width:640px}
+
+/* Phone */
+#phoneWrap{width:390px;height:812px;transform-origin:195px 406px}
+#phoneWrap .phone{height:812px;box-shadow:0 60px 90px -40px rgba(45,27,61,.55)}
+.viewport{position:relative;flex:1;overflow:hidden}
+#pages{position:absolute;top:0;left:0;height:100%;width:400%;display:flex}
+#pages>.pg{width:25%;height:100%;padding:4px 16px 110px;box-sizing:border-box;overflow:hidden}
+#scr .scrim{display:block;opacity:0}
+#scr .sheet{visibility:visible}
+#tap{position:absolute;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;pointer-events:none;z-index:60}
+#tap .dotc{position:absolute;inset:0;border-radius:50%;background:rgba(255,255,255,.92);border:3px solid var(--plum);box-shadow:0 8px 20px rgba(45,27,61,.35)}
+#tap .rip{position:absolute;inset:0;border-radius:50%;border:3px solid var(--coral)}
+#rows{position:relative;height:406px}
+#rows .row{position:absolute;left:0;right:0;margin:0}
+
+/* Communities list (new screen) */
+.comm{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:12px 14px;margin-bottom:9px}
+.comm .avatar{width:40px;height:40px;font-size:14px;font-family:var(--display);font-weight:800}
+.comm .ci{flex:1;display:flex;flex-direction:column;gap:1px}
+.comm .ci b{font-size:16px}
+.comm .ci span{font-size:12.5px;color:var(--muted)}
+.comm .go{font-family:var(--display);font-weight:800;font-size:20px;color:var(--muted)}
+.comm.new{border:1.5px dashed #C9BDD9;background:transparent;justify-content:center;font-weight:700;color:var(--plum);font-size:14.5px;padding:14px}
+
+/* Suggest sheet (the app's own sheet, with typed-in text) */
+.fake{border:1.5px solid var(--line);border-radius:14px;padding:12px;background:var(--bg);font-size:15px;line-height:1.35}
+#sgText{min-height:66px;border-color:var(--plum);background:#fff}
+#caret{display:inline-block;width:2px;height:18px;background:var(--coral);vertical-align:-3px;margin-left:1px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+/* Redeem ticket */
+.ticket{display:flex;gap:14px;align-items:center;border:1.5px dashed var(--coral);border-radius:18px;padding:14px;margin-bottom:16px;background:#FFF5F2}
+.ticket .qr{width:96px;height:96px;background:#fff;border-radius:12px;padding:6px;box-sizing:border-box;flex:none}
+.ticket .qr svg{width:100%;height:100%;display:block}
+.ticket b{display:block;font-family:var(--display);font-size:20px;letter-spacing:-.3px}
+.ticket span{display:block;font-size:13.5px;color:var(--muted);margin-top:2px}
+.ticket .code{font-weight:700;color:var(--plum);letter-spacing:1px}
+
+/* Big live odds panel */
+#panel{width:960px;height:660px;border-radius:40px;background:#fff;box-shadow:0 60px 100px -50px rgba(45,27,61,.45),0 0 0 1px #E3DCEC;transform-origin:0 50%;padding:44px 48px;box-sizing:border-box}
+#panel .pm{display:flex;align-items:center;gap:12px;font-size:22px;color:var(--muted)}
+#panel .pm .avatar{width:40px;height:40px;font-size:15px}
+#panel h2{font-family:var(--display);font-weight:700;font-size:46px;line-height:1.12;letter-spacing:-1.2px;margin:18px 0 10px;color:var(--ink)}
+#panel .prow{display:flex;align-items:flex-end;gap:26px}
+#pNum{font-family:var(--display);font-weight:800;font-size:150px;line-height:.86;letter-spacing:-6px;color:var(--coral)}
+#panel .pwhat{font-size:30px;font-weight:700;color:var(--muted);padding-bottom:12px}
+#panel .plive{display:inline-flex;align-items:center;gap:10px;font-size:22px;font-weight:700;color:var(--muted);margin-bottom:12px}
+#panel .plive i{width:13px;height:13px;border-radius:50%;background:var(--mint-dark)}
+#chart{position:absolute;left:48px;bottom:78px}
+#pFoot{position:absolute;left:48px;bottom:38px;font-size:22px;color:var(--muted)}
+.bub{width:40px;height:40px;border-radius:50%;margin:-20px 0 0 -20px;display:grid;place-items:center;box-shadow:0 6px 14px rgba(45,27,61,.25);border:3px solid #fff}
+.bub svg{width:20px;height:20px}
+.stamp{font-family:var(--display);font-weight:800;text-transform:uppercase;letter-spacing:2px;border-radius:20px;white-space:nowrap}
+#stamp{font-size:58px;color:var(--mint-dark);border:7px solid var(--mint-dark);background:rgba(255,255,255,.94);padding:12px 34px}
+#plus{font-family:var(--display);font-weight:800;font-size:72px;color:var(--mint-dark);-webkit-text-stroke:2px #fff;text-shadow:0 10px 24px rgba(46,142,116,.35)}
+.pt{width:14px;height:14px;border-radius:50%;margin:-7px 0 0 -7px}
+
+/* Big rank */
+#bigRank{width:960px}
+#bigRank .n{font-family:var(--display);font-weight:800;font-size:330px;line-height:.9;letter-spacing:-14px;color:var(--coral)}
+#bigRank .n small{font-size:120px;letter-spacing:-4px;color:var(--plum)}
+#bigRank .of{font:700 34px var(--body);color:var(--muted);margin-top:18px}
+#bigRank .later{font:700 24px var(--body);color:var(--coral-dark);letter-spacing:1px;margin-bottom:18px}
+
+/* Big prize card */
+#prize{width:840px;height:520px;border-radius:44px;background:var(--coral);color:#fff;padding:54px;box-sizing:border-box;transform-origin:50% 50%;box-shadow:0 70px 110px -50px rgba(217,72,42,.8)}
+#prize .biz{display:flex;align-items:center;gap:18px;font-weight:700;font-size:30px}
+#prize .logo{width:70px;height:70px;border-radius:20px;background:rgba(255,255,255,.2);display:grid;place-items:center}
+#prize h3{font-family:var(--display);font-weight:800;font-size:74px;line-height:1.02;letter-spacing:-2px;margin:30px 0 16px}
+#prize p{font-size:30px;opacity:.95;margin:0 0 28px}
+#prize .pill{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.2);border-radius:999px;padding:12px 22px;font-size:24px;font-weight:700}
+#winStamp{font-size:54px;color:#fff;background:var(--plum);padding:18px 34px;box-shadow:0 20px 40px -10px rgba(45,27,61,.6)}
+#winStamp small{display:block;font-family:var(--body);font-size:22px;letter-spacing:1px;text-transform:none;color:var(--mint);font-weight:700;margin-top:4px}
+#tagline{font-size:30px;font-weight:500;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="ring" class="abs"></div>
+  <div id="blob" class="abs"></div>
+  <div id="blob2" class="abs"></div>
+  <div id="bigNum" class="abs bignum">01</div>
+
+  <!-- captions -->
+  <div id="cap1" class="cap" style="left:150px;top:300px;width:800px">
+    <p class="kick">01 — Communities</p>
+    <h1 class="ttl"><span class="ln"><span>Pick your</span></span><span class="ln"><span>community.</span></span></h1>
+    <p class="sub">Your college, a society, your friends. Or start your own.</p>
+  </div>
+  <div id="cap2" class="cap" style="left:150px;top:300px;width:800px">
+    <p class="kick">02 — Ask</p>
+    <h1 class="ttl"><span class="ln"><span>Propose your</span></span><span class="ln"><span>own question.</span></span></h1>
+    <p class="sub">Two possible answers. Organisers check it before it goes live.</p>
+  </div>
+  <div id="cap3" class="cap" style="left:840px;top:64px;width:1000px">
+    <p class="kick">03 — Call it</p>
+    <h1 class="ttl s"><span class="ln"><span>Answer other people's.</span></span><span class="ln"><span>See what the crowd thinks.</span></span></h1>
+  </div>
+  <div id="cap4" class="cap" style="left:840px;top:64px;width:1000px">
+    <p class="kick">04 — Results</p>
+    <h1 class="ttl s"><span class="ln"><span>Be right, earn points,</span></span><span class="ln"><span>climb the table.</span></span></h1>
+  </div>
+  <div id="cap5" class="cap" style="left:840px;top:64px;width:1000px">
+    <p class="kick">05 — Rewards</p>
+    <h1 class="ttl s"><span class="ln"><span>Redeem prizes at</span></span><span class="ln"><span>local businesses.</span></span></h1>
+  </div>
+
+  <!-- the phone: the app's real markup and styles, plus two screens that are next on the roadmap -->
+  <div id="phoneWrap" class="abs">
+    <div class="phone"><div class="screen" id="scr">
+      <div class="toast" id="toast"><span class="ti">✓</span><span id="toastTxt">Approved by the organisers: your call is live</span></div>
+      <header class="top">
+        <button class="comm-btn"><span class="dot" id="commDot">+</span><span class="name" id="commName">Choose a community</span></button>
+        <div class="top-right">
+          <button class="pts-pill" id="pill"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z"/></svg><span id="pts">0</span></button>
+          <button class="about-btn">?</button>
+        </div>
+      </header>
+      <div class="viewport"><div id="pages">
+        <!-- Communities -->
+        <div class="pg">
+          <h1 class="page-title">Communities</h1>
+          <p class="page-sub">Each one has its own calls, table and prizes.</p>
+          <div class="comm" id="cm0"><span class="avatar" style="background:var(--plum)">KE</span><div class="ci"><b>King's E-Lab</b><span>42 people · 5 live calls</span></div><span class="go">›</span></div>
+          <div class="comm" id="cm1"><span class="avatar" style="background:#4B6CB7">TC</span><div class="ci"><b>Trinity College</b><span>612 people · 9 live calls</span></div><span class="go">›</span></div>
+          <div class="comm" id="cm2"><span class="avatar" style="background:#B5487A">CU</span><div class="ci"><b>Cambridge Union</b><span>1,240 people · 7 live calls</span></div><span class="go">›</span></div>
+          <div class="comm" id="cm3"><span class="avatar" style="background:#2E8E74">BC</span><div class="ci"><b>Boat Club</b><span>86 people · 4 live calls</span></div><span class="go">›</span></div>
+          <div class="comm" id="cm4"><span class="avatar" style="background:#D9482A">FL</span><div class="ci"><b>Footlights</b><span>128 people · 3 live calls</span></div><span class="go">›</span></div>
+          <div class="comm new" id="cm5">+ Start a community</div>
+        </div>
+        <!-- Calls -->
+        <div class="pg">
+          <h1 class="page-title">Calls</h1>
+          <p class="page-sub">What's going to happen at King's E-Lab?</p>
+          <div class="seg"><button aria-pressed="true">Live <span class="seg-count" id="liveCount">2</span></button><button>Yours</button><button>Results</button></div>
+          <div id="c0wrap" style="overflow:hidden">
+            <article class="call" id="c0">
+              <div class="call-meta"><span class="avatar" style="background:var(--coral)">S</span><span><b>Sam (you)</b> · just approved</span></div>
+              <h3>Which pub after Friday's formal?</h3>
+              <div class="vote"><button class="yes">The Eagle</button><button class="no">The Anchor</button></div>
+            </article>
+          </div>
+          <article class="call" id="c1">
+            <div class="call-meta"><span class="avatar" style="background:#8A4FBF">H</span><span><b>Hannah</b> · suggested call</span></div>
+            <h3>Will 100 people come to Friday's bop?</h3>
+            <div class="chips" id="c1chips"><span class="chip">Result: Yes</span><span class="chip won">You called it: +20</span></div>
+            <div class="bar bar-empty fc-locked" id="c1lock"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see what the crowd thinks</div>
+            <div class="fc" id="c1fc">
+              <div class="fc-top">
+                <div class="fc-main"><div><span class="fc-num" id="c1num">50%</span></div><div class="fc-sub">chance it happens</div></div>
+                <div class="fc-side"><span class="live" id="c1live"><i id="c1dotLive"></i><span id="c1liveTxt">Updated live</span></span>
+                  <svg class="spark" width="88" height="26" viewBox="0 0 88 26"><line x1="0" y1="13" x2="88" y2="13" class="mid"/><path id="c1path"/><circle id="c1end" r="2.5"/></svg></div>
+              </div>
+              <div class="meter"><i id="c1meter"></i></div>
+            </div>
+            <div class="call-foot"><span id="c1foot">10 people called it · Closes Friday</span><button class="cmt-btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>2</button></div>
+            <div class="vote" id="c1vote"><button class="yes" id="yesBtn">Yes</button><button class="no">No</button></div>
+            <div class="my-stake" id="c1stake"><span>You called <span class="side-tag y">Yes</span> · Certain</span><span class="my-odds pick-0" id="c1odds">58% chance</span></div>
+          </article>
+          <article class="call">
+            <div class="call-meta"><span class="avatar" style="background:var(--plum)">KE</span><span><b>King's E-Lab</b> · official call</span></div>
+            <h3>Will the showcase run over time?</h3>
+            <div class="vote"><button class="yes">Yes</button><button class="no">No</button></div>
+          </article>
+        </div>
+        <!-- Ranks -->
+        <div class="pg">
+          <h1 class="page-title">Ranks</h1>
+          <p class="page-sub">Season 1 in King's E-Lab. Points land when a call is settled.</p>
+          <div class="banner"><span>★</span><span id="rkBanner"><b>You're 7th of 42.</b> Honest confidence scores best over a season.</span></div>
+          <div id="rows"></div>
+        </div>
+        <!-- Rewards -->
+        <div class="pg">
+          <h1 class="page-title">Rewards</h1>
+          <p class="page-sub">Top the table to win prizes from local places. Free to play.</p>
+          <article class="chal reward">
+            <div class="biz"><span class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11a5 5 0 0 1 10 0"/><path d="M6 11h12l-6 11z"/></svg></span>Jack's Gelato</div>
+            <h3>A free gelato from Jack's Gelato</h3>
+            <p>You topped the King's E-Lab table this week.</p>
+            <div class="chal-actions"><button id="redeemBtn">Redeem in the shop</button></div>
+          </article>
+          <div class="banner"><span>★</span><span><b>You're 1st of 42</b> with 90 points. Top of the table: hold on to it!</span></div>
+        </div>
+      </div></div>
+      <nav class="nav" id="nav">
+        <button data-tab="calls"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Calls</button>
+        <button data-tab="ranks"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>Ranks</button>
+        <button class="fab" id="fab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+        <button data-tab="rewards"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="13" rx="2"/><path d="M12 8v13M3 12h18M12 8c-2-4-6-4-6-1.5S10 8 12 8zm0 0c2-4 6-4 6-1.5S14 8 12 8z"/></svg>Rewards</button>
+        <button data-tab="me"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Me</button>
+      </nav>
+      <div class="scrim" id="scrim"></div>
+      <!-- suggest a call -->
+      <div class="sheet" id="sgSheet">
+        <div class="grab"></div>
+        <h2>Suggest a call</h2>
+        <p class="lead">A question with two possible answers, for everyone in King's E-Lab.</p>
+        <div class="field"><label>Your question</label><div class="fake" id="sgText"><span id="sgTyped"></span><span id="caret"></span></div></div>
+        <div class="field two"><div><label>Answer 1</label><div class="fake" id="sgA1"></div></div><div><label>Answer 2</label><div class="fake" id="sgA2"></div></div></div>
+        <button class="primary" id="sendBtn">Send suggestion</button>
+      </div>
+      <!-- how sure are you -->
+      <div class="sheet" id="sheet">
+        <div class="grab"></div>
+        <p class="sheet-q">Will 100 people come to Friday's bop?</p>
+        <h2>You're calling <span class="side-tag y">Yes</span></h2>
+        <p class="lead">How sure are you?</p>
+        <div class="conf">
+          <button id="cf0"><span class="dots"><i class="on"></i><i></i><i></i></span><b>Hunch</b><span>Just a feeling</span></button>
+          <button id="cf1"><span class="dots"><i class="on"></i><i class="on"></i><i></i></span><b>Fairly sure</b><span>Pretty confident</span></button>
+          <button id="cf2"><span class="dots"><i class="on"></i><i class="on"></i><i class="on"></i></span><b>Certain</b><span>No doubt</span></button>
+        </div>
+        <p class="conf-note">The surer you are, the more you win if you're right, and the more you risk if you're wrong.</p>
+        <button class="primary" id="lockBtn">Lock in my call</button>
+      </div>
+      <!-- redeem -->
+      <div class="sheet" id="rdSheet">
+        <div class="grab"></div>
+        <h2>Your reward</h2>
+        <p class="lead">Show this at the counter at Jack's Gelato.</p>
+        <div class="ticket"><div class="qr" id="rdQr"></div><div><b>1 free gelato</b><span class="code">BNOC-4821</span><span>Valid this week</span></div></div>
+        <button class="primary dark">Done</button>
+      </div>
+    </div></div>
+    <div id="tap"><div class="rip" id="rip"></div><div class="dotc" id="tapDot"></div></div>
+  </div>
+
+  <!-- big live odds panel -->
+  <div id="panel" class="abs">
+    <div class="pm"><span class="avatar" style="background:#8A4FBF">H</span><span><b style="color:var(--ink)">Hannah</b> · suggested call</span></div>
+    <h2>Will 100 people come to Friday's bop?</h2>
+    <div class="prow">
+      <span id="pNum">50%</span>
+      <div><div class="plive" id="pLive"><i id="pDot"></i><span id="pLiveTxt">Updated live</span></div><div class="pwhat">chance it happens</div></div>
+    </div>
+    <svg id="chart" width="864" height="250" viewBox="0 0 864 250">
+      <defs><linearGradient id="fill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#FF6B4A" stop-opacity=".28"/><stop offset="1" stop-color="#FF6B4A" stop-opacity="0"/></linearGradient></defs>
+      <line x1="0" x2="864" y1="176" y2="176" stroke="#E3DCEC" stroke-width="2" stroke-dasharray="8 8"/>
+      <text x="864" y="166" text-anchor="end" font-size="18" font-weight="700" fill="#B8AEC7" font-family="DM Sans">50%</text>
+      <path id="area" fill="url(#fill)"/>
+      <path id="line" fill="none" stroke="#FF6B4A" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle id="lineEnd" r="11" fill="#FF6B4A" stroke="#fff" stroke-width="4"/>
+    </svg>
+    <div id="pFoot">10 people called it · Closes Friday</div>
+    <div id="bubbles"></div>
+    <div id="stamp" class="abs stamp">112 came · Yes</div>
+  </div>
+  <div id="plus" class="abs">+20</div>
+
+  <!-- big rank -->
+  <div id="bigRank" class="abs">
+    <div class="later">A few good calls later…</div>
+    <div class="n"><span id="brN">7</span><small id="brS">th</small></div>
+    <div class="of">of 42 in King's E-Lab</div>
+  </div>
+
+  <!-- big prize card -->
+  <div id="prize" class="abs">
+    <div class="biz"><span class="logo"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11a5 5 0 0 1 10 0"/><path d="M6 11h12l-6 11z"/></svg></span>Jack's Gelato</div>
+    <h3>A free gelato, for calling it right</h3>
+    <p>Show your code at the counter.</p>
+    <span class="pill">★ Funded by the business, never by players</span>
+  </div>
+  <div id="winStamp" class="abs stamp">Redeemed<small>Sam walked in · Jack's Gelato</small></div>
+  <div id="tagline" class="abs">Free to play. No money in, no money out.</div>
+
+  <div id="particles"></div>
+</div>
+
+<script>
+window.DURATION = 45;
+const $ = id => document.getElementById(id);
+
+// ---------- timing helpers ----------
+const clamp = x => x < 0 ? 0 : x > 1 ? 1 : x;
+const E = {
+  lin: x => x,
+  out: x => 1 - Math.pow(1 - x, 3),
+  in: x => x * x * x,
+  io: x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2,
+  expo: x => x >= 1 ? 1 : 1 - Math.pow(2, -10 * x),
+  expoIo: x => x <= 0 ? 0 : x >= 1 ? 1 : x < .5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2,
+  back: x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); }
+};
+const P = (t, a, b, e = E.io) => e(clamp((t - a) / (b - a)));
+const L = (a, b, p) => a + (b - a) * p;
+// Visible between a and b, fading in/out over the given durations.
+const env = (t, a, b, fin = .5, fout = .5) => Math.min(P(t, a, a + fin, E.out), 1 - P(t, b - fout, b, E.in));
+function keyframes(t, frames) {
+  if (t <= frames[0].t) return frames[0];
+  for (let i = 0; i < frames.length - 1; i++) {
+    const a = frames[i], b = frames[i + 1];
+    if (t <= b.t) {
+      const p = P(t, a.t, b.t, b.e || E.io), o = {};
+      for (const k in b) if (k !== 't' && k !== 'e') o[k] = L(a[k], b[k], p);
+      return o;
+    }
+  }
+  return frames[frames.length - 1];
+}
+const S = (el, css) => Object.assign(el.style, css);
+const show = (el, on) => { el.style.display = on ? '' : 'none'; };
+
+// Smooth curve through points (Catmull-Rom), the same shape the app draws.
+function curve(pts) {
+  let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    d += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
+// ---------- story data ----------
+const QUESTION = "Which pub after Friday's formal?";
+const HISTORY = [50, 53, 51, 55, 58];          // the crowd before you (revealed when you call)
+const INCOMING = [61, 64, 60, 66, 69, 71];     // new calls arriving while you watch
+const T_IN = k => 21.4 + k * .62;
+const BUB_COLORS = ['#2E8E74', '#8A4FBF', '#4B6CB7', '#D9482A', '#B5487A', '#2D1B3D'];
+
+function oddsPoints(t) {
+  const pts = HISTORY.slice();
+  for (let k = 0; k < INCOMING.length; k++) {
+    const f = P(t, T_IN(k) - .35, T_IN(k) + .25, E.io);
+    if (f <= 0) break;
+    pts.push(L(pts[pts.length - 1], INCOMING[k], f));
+    if (f < 1) break;
+  }
+  return pts;
+}
+const arrived = t => INCOMING.filter((_, k) => t >= T_IN(k)).length;
+
+const PEOPLE = [
+  { n: 'Hannah', c: '#8A4FBF', a: 70, b: 75 }, { n: 'Mark', c: '#2E8E74', a: 65, b: 70 },
+  { n: 'Priya', c: '#FF6B4A', a: 60, b: 60 }, { n: 'Tom', c: '#4B6CB7', a: 55, b: 45 },
+  { n: 'Grace', c: '#B5487A', a: 40, b: 50 }, { n: 'Utsav', c: '#D9482A', a: 30, b: 30 },
+  { n: 'Sam (you)', c: '#2D1B3D', a: 20, b: 90, me: true }
+];
+const ORD = ['th', 'st', 'nd', 'rd', 'th', 'th', 'th', 'th'];
+
+// Particle bursts (fixed "random" directions so every render is identical).
+const BURSTS = [
+  { t: 26.55, x: 1330, y: 740, n: 34 },   // result stamp
+  { t: 32.5, x: 1150, y: 520, n: 30 },    // reaching 1st
+  { t: 40.85, x: 1600, y: 330, n: 34 }    // redeemed
+];
+const PCOLORS = ['#FF6B4A', '#7FD8BE', '#2D1B3D', '#FFC857', '#8A4FBF'];
+
+// ---------- one-time setup ----------
+let TAP = {};
+function init() {
+  $('rdQr').innerHTML = window.QR_SVG;
+  $('rows').innerHTML = PEOPLE.map((p, i) => `<div class="row ${p.me ? 'me' : ''}" id="row${i}"><span class="rank" id="rk${i}">${i + 1}</span><span class="avatar" style="background:${p.c}">${p.n[0]}</span><span class="who">${p.n}</span><span class="sc" id="sc${i}">${p.a}</span></div>`).join('');
+  // incoming-call bubbles (anonymous: the app never shows who called what)
+  $('bubbles').innerHTML = INCOMING.map((_, k) => `<div class="bub abs" id="bub${k}" style="background:${BUB_COLORS[k]}"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>`).join('');
+  $('particles').innerHTML = BURSTS.map((b, bi) => Array.from({ length: b.n }, (_, i) =>
+    `<div class="pt abs" id="p${bi}_${i}" style="background:${PCOLORS[(i * 7 + bi) % PCOLORS.length]};${i % 3 === 0 ? 'border-radius:3px' : ''}"></div>`).join('')).join('');
+
+  // Where the tap targets are, relative to the phone. Each is measured with its own page or sheet showing.
+  const phone = document.querySelector('#phoneWrap .phone').getBoundingClientRect();
+  const centre = el => { const r = el.getBoundingClientRect(); return [r.left - phone.left + r.width / 2, r.top - phone.top + r.height / 2]; };
+  const page = k => { $('pages').style.transform = `translateX(${-k * 25}%)`; };
+  const sheets = ['sgSheet', 'sheet', 'rdSheet'];
+  const open = id => sheets.forEach(s => { $(s).style.transform = s === id ? 'none' : 'translateY(105%)'; });
+  S($('phoneWrap'), { transform: 'none' });
+  open(null);
+  page(0); TAP.comm = centre($('cm0')); TAP.fab = centre($('fab'));
+  open('sgSheet'); TAP.send = centre($('sendBtn'));
+  open(null); page(1); $('c0wrap').style.height = ''; show($('c1chips'), false); show($('c1fc'), false); show($('c1stake'), false);
+  TAP.yes = centre($('yesBtn'));
+  open('sheet'); TAP.certain = centre($('cf2')); TAP.lock = centre($('lockBtn'));
+  open(null); page(3); TAP.redeem = centre($('redeemBtn'));
+  TAP.c0h = $('c0').getBoundingClientRect().height + 12;
+  window.__ready = true;
+}
+
+// ---------- the timeline ----------
+window.render = function (t) {
+  // Background drift and the big faded scene number
+  S($('ring'), { transform: `translate(${1180 + 70 * Math.sin(t * .23)}px, ${-380 + 50 * Math.cos(t * .19)}px) rotate(${t * 4}deg)` });
+  S($('blob'), { transform: `translate(${-90 + 40 * Math.sin(t * .31)}px, ${780 + 36 * Math.cos(t * .27)}px)` });
+  S($('blob2'), { transform: `translate(${820 + 60 * Math.cos(t * .21)}px, ${880 + 30 * Math.sin(t * .35)}px)` });
+  const scenes = [[0, 6.7, '01'], [6.7, 14.7, '02'], [14.7, 25.7, '03'], [25.7, 35.2, '04'], [35.2, 99, '05']];
+  const sc = scenes.find(s => t >= s[0] && t < s[1]);
+  $('bigNum').textContent = sc ? sc[2] : '';
+  const bnOp = sc ? env(t, sc[0], sc[1], .6, .6) : 0;
+  const bnLeft = t < 14.7;
+  S($('bigNum'), { opacity: bnOp, transform: `translate(${bnLeft ? 90 : 1300}px, ${bnLeft ? 600 : 620}px) translateY(${(1 - bnOp) * 40}px)` });
+
+  // ----- captions: lines rise out of a mask, then drift away -----
+  const caption = (id, a, b) => {
+    const el = $(id), vis = env(t, a, b, .3, .5);
+    el.style.opacity = vis;
+    el.style.display = vis <= 0 ? 'none' : '';
+    const out = P(t, b - .5, b, E.in);
+    el.style.transform = `translateY(${-30 * out}px)`;
+    el.querySelectorAll('.ln>span').forEach((s, i) => { s.style.transform = `translateY(${(1 - P(t, a + .1 + i * .12, a + .8 + i * .12, E.expo)) * 110}%)`; });
+    const k = el.querySelector('.kick'); k.style.transform = `translateX(${(1 - P(t, a, a + .6, E.expo)) * -40}px)`;
+    const s = el.querySelector('.sub'); if (s) { s.style.opacity = P(t, a + .45, a + 1.05); s.style.transform = `translateY(${(1 - P(t, a + .45, a + 1.05, E.out)) * 16}px)`; }
+  };
+  caption('cap1', .3, 6.6); caption('cap2', 6.8, 14.6); caption('cap3', 15.5, 25.6);
+  caption('cap4', 25.8, 35.0); caption('cap5', 35.4, 99);
+
+  // ----- phone position (it glides between layouts) -----
+  const ph = keyframes(t, [
+    { t: 0, x: 1330, y: 760, s: .86, r: -12, o: 0 },
+    { t: 1.0, x: 1330, y: 540, s: 1.08, r: 0, o: 1, e: E.out },
+    { t: 14.5, x: 1330, y: 540, s: 1.08, r: 0, o: 1 },
+    { t: 15.7, x: 460, y: 545, s: 1.0, r: 0, o: 1, e: E.expoIo }
+  ]);
+  const bob = 6 * Math.sin(t * 1.3);
+  S($('phoneWrap'), { opacity: ph.o, transform: `translate(${ph.x - 195}px, ${ph.y - 406 + bob}px) scale(${ph.s}) rotate(${ph.r}deg)` });
+
+  // ----- inside the phone: which page -----
+  const page = P(t, 4.45, 5.15, E.expoIo) + P(t, 29.2, 29.9, E.expoIo) + P(t, 35.2, 35.9, E.expoIo);
+  S($('pages'), { transform: `translateX(${-page * 25}%)` });
+  const tab = page < .5 ? '' : page < 1.5 ? 'calls' : page < 2.5 ? 'ranks' : 'rewards';
+  document.querySelectorAll('#nav [data-tab]').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  const chosen = t >= 4.5;
+  $('commName').textContent = chosen ? "King's E-Lab" : 'Choose a community';
+  $('commDot').textContent = chosen ? 'KE' : '+';
+
+  // scene 1: the community rows arrive one by one, and the first one is picked
+  for (let i = 0; i < 6; i++) {
+    const f = P(t, .9 + i * .13, 1.5 + i * .13, E.out);
+    S($('cm' + i), { opacity: f, transform: `translateY(${(1 - f) * 22}px)` });
+  }
+  const pickFlash = env(t, 4.15, 4.6, .05, .25);
+  S($('cm0'), { borderColor: pickFlash > .2 ? 'var(--coral)' : '', background: pickFlash > .2 ? '#FFF1EC' : '', transform: `scale(${1 - .03 * pickFlash})` });
+
+  // scene 2: the suggest sheet, with the question typed in
+  const sgUp = P(t, 8.05, 8.6, E.out) * (1 - P(t, 12.15, 12.6, E.in));
+  S($('sgSheet'), { transform: `translateY(${(1 - sgUp) * 105}%)` });
+  const typed = Math.round(QUESTION.length * P(t, 8.9, 10.6, E.lin));
+  $('sgTyped').textContent = QUESTION.slice(0, typed);
+  show($('caret'), t < 11.6 && Math.floor(t * 2.5) % 2 === 0 || (t > 8.9 && t < 10.6));
+  $('sgA1').textContent = t >= 10.8 ? 'The Eagle' : '';
+  $('sgA2').textContent = t >= 11.15 ? 'The Anchor' : '';
+  const sendFlash = env(t, 11.95, 12.3, .05, .2);
+  S($('sendBtn'), { transform: `scale(${1 - .04 * sendFlash})`, background: sendFlash > .3 ? 'var(--coral-dark)' : '' });
+  S($('fab'), { transform: `scale(${1 - .1 * env(t, 7.85, 8.2, .05, .2)})` });
+  // your question joins the feed
+  const grow = P(t, 13.0, 13.6, E.out);
+  S($('c0wrap'), { height: `${grow * TAP.c0h}px`, opacity: grow });
+  S($('c0'), { transform: `scale(${L(.94, 1, grow)})`, transformOrigin: '50% 0', borderColor: t > 13 && t < 15 ? 'var(--coral)' : '' });
+
+  // scene 3: how sure are you?
+  const sheetUp = P(t, 16.75, 17.3, E.out) * (1 - P(t, 19.15, 19.6, E.in));
+  S($('sheet'), { transform: `translateY(${(1 - sheetUp) * 105}%)` });
+  const pick = t < 18.0 ? 1 : 2;
+  ['cf0', 'cf1', 'cf2'].forEach((id, i) => $(id).setAttribute('aria-pressed', String(i === pick)));
+  const lockFlash = env(t, 18.95, 19.3, .05, .2);
+  S($('lockBtn'), { transform: `scale(${1 - .04 * lockFlash})`, background: lockFlash > .3 ? 'var(--coral-dark)' : '' });
+  $('cf2').style.transform = `scale(${1 - .05 * env(t, 17.95, 18.25, .05, .2)})`;
+  $('yesBtn').style.transform = `scale(${1 - .05 * env(t, 16.5, 16.85, .05, .2)})`;
+  $('yesBtn').style.background = t > 16.55 && t < 16.95 ? 'var(--coral)' : '';
+  $('yesBtn').style.color = t > 16.55 && t < 16.95 ? '#fff' : '';
+
+  // scene 5: the reward ticket
+  const rdUp = P(t, 37.95, 38.5, E.out);
+  S($('rdSheet'), { transform: `translateY(${(1 - rdUp) * 105}%)` });
+  S($('redeemBtn'), { transform: `scale(${1 - .06 * env(t, 37.75, 38.1, .05, .2)})` });
+  S($('scrim'), { opacity: Math.max(sgUp, sheetUp, rdUp) });
+
+  // toasts
+  const toastA = P(t, 12.6, 13.0, E.out) * (1 - P(t, 14.3, 14.7, E.in));
+  const toastB = P(t, 19.5, 19.9, E.out) * (1 - P(t, 21.6, 22.0, E.in));
+  $('toastTxt').textContent = t < 16 ? 'Approved by the organisers: your call is live' : "Locked in: Yes. Here's what the crowd thinks";
+  S($('toast'), { transform: `translateY(${(1 - Math.max(toastA, toastB)) * -140}%)` });
+
+  // the tap "finger"
+  const tp = keyframes(t, [
+    { t: 2.9, x: 300, y: 900, o: 0 }, { t: 3.3, x: 300, y: 760, o: 1 },
+    { t: 4.05, x: TAP.comm[0] + 60, y: TAP.comm[1], o: 1 },
+    { t: 4.6, x: TAP.comm[0] + 60, y: TAP.comm[1], o: 1 }, { t: 5.0, x: 300, y: 600, o: 0 },
+    { t: 7.0, x: 300, y: 640, o: 0 }, { t: 7.3, x: 300, y: 640, o: 1 },
+    { t: 7.8, x: TAP.fab[0], y: TAP.fab[1], o: 1 },
+    { t: 8.4, x: TAP.fab[0], y: TAP.fab[1], o: 1 }, { t: 8.8, x: 320, y: 560, o: 0 },
+    { t: 11.2, x: 320, y: 600, o: 0 }, { t: 11.5, x: 320, y: 620, o: 1 },
+    { t: 11.9, x: TAP.send[0], y: TAP.send[1], o: 1 },
+    { t: 12.3, x: TAP.send[0], y: TAP.send[1], o: 1 }, { t: 12.7, x: TAP.send[0], y: TAP.send[1] + 30, o: 0 },
+    { t: 15.7, x: 300, y: 720, o: 0 }, { t: 16.0, x: 300, y: 700, o: 1 },
+    { t: 16.5, x: TAP.yes[0], y: TAP.yes[1], o: 1 },
+    { t: 17.2, x: TAP.yes[0], y: TAP.yes[1], o: 1 }, { t: 17.5, x: 200, y: 640, o: 1 },
+    { t: 17.95, x: TAP.certain[0], y: TAP.certain[1], o: 1 },
+    { t: 18.5, x: TAP.certain[0], y: TAP.certain[1], o: 1 },
+    { t: 18.95, x: TAP.lock[0], y: TAP.lock[1], o: 1 },
+    { t: 19.3, x: TAP.lock[0], y: TAP.lock[1], o: 1 }, { t: 19.7, x: TAP.lock[0], y: TAP.lock[1] + 30, o: 0 },
+    { t: 36.6, x: 300, y: 640, o: 0 }, { t: 36.9, x: 300, y: 620, o: 1 },
+    { t: 37.7, x: TAP.redeem[0], y: TAP.redeem[1], o: 1 },
+    { t: 38.2, x: TAP.redeem[0], y: TAP.redeem[1], o: 1 }, { t: 38.6, x: TAP.redeem[0], y: TAP.redeem[1] + 30, o: 0 }
+  ]);
+  const presses = [4.2, 7.9, 12.0, 16.55, 18.0, 19.0, 37.8];
+  const press = Math.max(...presses.map(p => env(t, p - .08, p + .22, .06, .16)));
+  S($('tap'), { opacity: tp.o, transform: `translate(${tp.x}px, ${tp.y}px)`, display: tp.o <= 0 ? 'none' : '' });
+  S($('tapDot'), { transform: `scale(${1 - .22 * press})` });
+  const rp = presses.map(p => clamp((t - p) / .55)).find(x => x > 0 && x < 1);
+  S($('rip'), { opacity: rp ? 1 - rp : 0, transform: `scale(${1 + (rp || 0) * 1.8})` });
+
+  // Hannah's card: locked → answered (crowd revealed) → settled
+  const answered = t >= 19.6;
+  const settled = t >= 26.8;
+  show($('c1lock'), !answered);
+  show($('c1vote'), !answered);
+  show($('c1fc'), answered);
+  show($('c1stake'), answered && !settled);
+  show($('c1chips'), settled);
+  $('liveCount').textContent = (t >= 13.2 ? 3 : 2) - (answered ? 1 : 0);
+  const reveal = P(t, 19.65, 20.3, E.out);
+  S($('c1fc'), { opacity: reveal, transform: `translateY(${(1 - reveal) * 10}px)` });
+  $('c1chips').style.transform = `scale(${L(1.25, 1, P(t, 26.8, 27.2, E.back))})`;
+  $('c1chips').style.transformOrigin = '0 50%';
+
+  // the crowd's odds (same numbers in the card and the big panel)
+  const pts = oddsPoints(t);
+  const T_LIVE = 21.1;
+  const draw = P(t, 19.8, 21.0, E.io);                    // draw-on of the history
+  const revealNum = Math.round(L(50, HISTORY[HISTORY.length - 1], draw));
+  const liveVal = t < T_LIVE ? revealNum : Math.round(pts[pts.length - 1]);
+  $('c1num').textContent = liveVal + '%';
+  $('c1odds').textContent = liveVal + '% chance';
+  $('c1meter').style.width = liveVal + '%';
+  const people = 10 + 1 + arrived(t);
+  const closed = t >= 25.9;
+  $('c1foot').textContent = `${answered ? people : 10} people called it · ${settled ? 'Settled' : 'Closes Friday'}`;
+  $('pFoot').textContent = `${people} people called it · ${closed ? 'Closed Friday, 23:59' : 'Closes Friday'}`;
+  $('c1liveTxt').textContent = closed ? 'Final odds' : 'Updated live';
+  $('pLiveTxt').textContent = closed ? 'Final odds' : 'Updated live';
+  const pulse = closed ? 0 : .35 + .65 * (.5 + .5 * Math.cos(t * 3.5));
+  S($('c1dotLive'), { opacity: pulse, display: closed ? 'none' : '' });
+  S($('pDot'), { opacity: pulse, display: closed ? 'none' : '' });
+
+  // small sparkline in the card
+  const sp = t < T_LIVE ? HISTORY.slice(0, Math.max(2, Math.ceil(draw * HISTORY.length))) : pts;
+  const sPts = sp.map((v, i) => [3 + i / (sp.length - 1) * 82, 3 + (1 - v / 100) * 20]);
+  $('c1path').setAttribute('d', curve(sPts));
+  const se = sPts[sPts.length - 1];
+  $('c1end').setAttribute('cx', se[0]); $('c1end').setAttribute('cy', se[1]);
+
+  // ----- the big panel -----
+  const panIn = P(t, 19.9, 20.8, E.expo);
+  const panOut = P(t, 28.8, 29.35, E.in);
+  S($('panel'), {
+    display: t < 19.85 || t > 29.4 ? 'none' : '',
+    opacity: panIn * (1 - panOut),
+    transform: `translate(${840 + panOut * 120}px, 300px) scale(${L(.72, 1, panIn)}) perspective(1600px) rotateY(${(1 - panIn) * -18}deg)`
+  });
+  $('pNum').textContent = liveVal + '%';
+  const W = 864, H = 250, pad = 16;
+  const cp = t < T_LIVE ? HISTORY : pts;
+  const n = cp.length;
+  const yOf = v => pad + (1 - (v - 44) / 32) * (H - 2 * pad);
+  const xy = cp.map((v, i) => [pad + i / (n - 1) * (W - 2 * pad), yOf(v)]);
+  const cut = t < T_LIVE ? P(t, 20.1, 21.0, E.io) : 1;   // draw-on: clip the line to the reveal progress
+  const upto = Math.max(1, cut * (n - 1));
+  const whole = Math.floor(upto), frac = upto - whole;
+  const vis = xy.slice(0, whole + 1);
+  if (frac > 0 && whole < n - 1) vis.push([L(xy[whole][0], xy[whole + 1][0], frac), L(xy[whole][1], xy[whole + 1][1], frac)]);
+  const dLine = curve(vis.length > 1 ? vis : [xy[0], xy[0]]);
+  $('line').setAttribute('d', dLine);
+  const last = vis[vis.length - 1];
+  $('area').setAttribute('d', `${dLine} L${last[0].toFixed(1)},${H} L${pad},${H} Z`);
+  $('lineEnd').setAttribute('cx', last[0]); $('lineEnd').setAttribute('cy', last[1]);
+  $('lineEnd').setAttribute('r', 11 + 5 * Math.max(0, ...INCOMING.map((_, k) => env(t, T_IN(k) - .05, T_IN(k) + .35, .05, .3))));
+
+  // incoming calls fly into the end of the line
+  INCOMING.forEach((_, k) => {
+    const a = T_IN(k) - .7, b = T_IN(k);
+    const f = P(t, a, b, E.io), gone = P(t, b, b + .25, E.in);
+    const from = [[900, -60], [980, 120], [900, 520], [620, 640], [1000, 360], [760, -80]][k];
+    const end = [48 + last[0], 660 - 78 - H + last[1]];
+    S($('bub' + k), { display: t > a && t < b + .25 ? '' : 'none', transform: `translate(${L(from[0], end[0], f)}px, ${L(from[1], end[1], f) - Math.sin(f * Math.PI) * 60}px) scale(${(1 - gone) * L(.6, 1, f)})`, opacity: 1 - gone });
+  });
+
+  // result stamp
+  const st = P(t, 26.4, 26.8, E.out);
+  S($('stamp'), { display: t < 26.4 ? 'none' : '', opacity: st, transform: `translate(250px, 380px) rotate(${L(-20, -8, st)}deg) scale(${L(2.2, 1, st)})` });
+
+  // +20 flies from the stamp to your score in the phone
+  const fl = P(t, 27.2, 28.1, E.io);
+  const pillX = 460 + (313 - 195), pillY = 545 + (66 - 406);
+  S($('plus'), { display: t < 27.1 || t > 28.3 ? 'none' : '', opacity: env(t, 27.1, 28.3, .15, .2),
+    transform: `translate(${L(1330 - 65, pillX - 65, fl) + Math.sin(fl * Math.PI) * 70}px, ${L(700 - 40, pillY - 40, fl)}px) scale(${L(1.1, .4, fl)})` });
+  const ptsVal = t < 28.1 ? 0 : t < 30.5 ? 20 : Math.round(L(20, 90, P(t, 30.5, 32.5, E.io)));
+  $('pts').textContent = ptsVal;
+  const bounce = Math.max(env(t, 28.1, 28.6, .08, .4), env(t, 32.5, 33.0, .08, .4));
+  S($('pill'), { transform: `scale(${1 + .25 * bounce})`, background: bounce > .2 ? 'var(--mint-dark)' : '' });
+
+  // ----- leaderboard reshuffle, and the big rank beside it -----
+  const rs = P(t, 30.7, 32.5, E.io), tick = P(t, 30.5, 32.5, E.io);
+  const afterOrder = PEOPLE.map((p, i) => i).sort((a, b) => PEOPLE[b].b - PEOPLE[a].b);
+  PEOPLE.forEach((p, i) => {
+    const r1 = afterOrder.indexOf(i);
+    $('sc' + i).textContent = Math.round(L(p.a, p.b, tick));
+    $('rk' + i).textContent = (rs < .5 ? i : r1) + 1;
+    S($('row' + i), { transform: `translateY(${L(i, r1, rs) * 58}px) ${p.me ? `scale(${1 + .04 * Math.sin(rs * Math.PI)})` : ''}`, zIndex: p.me ? 5 : 1 });
+  });
+  $('rkBanner').innerHTML = t < 32.3 ? '<b>You\'re 7th of 42.</b> Honest confidence scores best over a season.' : '<b>You\'re 1st of 42.</b> Top of the table: hold on to it!';
+  const brIn = P(t, 29.5, 30.3, E.expo), brOut = P(t, 34.6, 35.1, E.in);
+  const rankNow = Math.max(1, Math.round(L(7, 1, rs)));
+  $('brN').textContent = rankNow; $('brS').textContent = ORD[rankNow];
+  S($('bigRank'), { display: t < 29.45 || t > 35.15 ? 'none' : '', opacity: brIn * (1 - brOut),
+    transform: `translate(${880 + (1 - brIn) * 60}px, ${330 - brOut * 30}px) scale(${1 + .06 * env(t, 32.4, 33.0, .08, .4)})` });
+
+  // ----- the prize card -----
+  const pz = P(t, 38.4, 39.5, E.expo);
+  S($('prize'), { display: t < 38.35 ? 'none' : '', opacity: clamp(pz * 1.4),
+    transform: `translate(900px, 300px) perspective(1800px) rotateY(${(1 - pz) * 75}deg) rotateZ(${(1 - pz) * -4}deg) scale(${L(.8, 1, pz)})` });
+  const ws = P(t, 40.65, 41.05, E.out);
+  S($('winStamp'), { display: t < 40.6 ? 'none' : '', opacity: ws, transform: `translate(1400px, 250px) rotate(${L(-18, 6, ws)}deg) scale(${L(2.4, 1, ws)})` });
+  const tg = P(t, 41.9, 42.6, E.out);
+  S($('tagline'), { opacity: tg, transform: `translate(900px, ${870 + (1 - tg) * 16}px)` });
+
+  // ----- particle bursts -----
+  BURSTS.forEach((b, bi) => {
+    for (let i = 0; i < b.n; i++) {
+      const el = $(`p${bi}_${i}`);
+      const f = (t - b.t) / 1.4;
+      if (f <= 0 || f >= 1) { el.style.display = 'none'; continue; }
+      const ang = (i / b.n) * Math.PI * 2 + (i % 4) * .3;
+      const dist = (160 + ((i * 53) % 140)) * E.out(f);
+      S(el, { display: '', opacity: 1 - E.in(f), transform: `translate(${b.x + Math.cos(ang) * dist}px, ${b.y + Math.sin(ang) * dist + 180 * f * f}px) rotate(${f * 400 + i * 20}deg) scale(${1 - .4 * f})` });
+    }
+  });
+};
+
+// ---------- live playback (the pitch page calls these) ----------
+let raf = 0, t0 = 0;
+window.play = function (from = 0) {
+  cancelAnimationFrame(raf);
+  t0 = performance.now() - from * 1000;
+  const loop = now => {
+    const t = Math.min(window.DURATION, (now - t0) / 1000);
+    window.render(t);
+    if (t < window.DURATION) raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+};
+window.stop = function () { cancelAnimationFrame(raf); };
+
+const start = () => { init(); render(0); if (window.parent === window && !/still/.test(location.hash)) play(); else if (window.__autoplay) play(); };
+(document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]) : Promise.resolve()).then(start);
+</script>
+</body>
+</html>
