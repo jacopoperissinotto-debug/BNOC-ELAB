@@ -506,7 +506,13 @@ export default async (req) => {
     if (route === 'POST join') return join(st, body);
 
     const me = await currentUser(st, req);
-    if (route === 'GET state') return json(200, publicState(await loadWorld(st), me));
+    if (route === 'GET state') {
+      // Readable from other pages too (the pitch slides show the live player and call counts).
+      // It carries no login cookie, so another site only ever sees what a signed-out visitor sees.
+      const res = json(200, publicState(await loadWorld(st), me));
+      res.headers.set('access-control-allow-origin', '*');
+      return res;
+    }
     if (!me) return fail(401, 'Please join first.');
     if (route === 'POST forecast') return forecast(st, me, body);
     if (route === 'POST suggest') return suggest(st, me, body);
