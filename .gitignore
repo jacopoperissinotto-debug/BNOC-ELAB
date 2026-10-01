@@ -22,3 +22,10 @@ deno.lock
 # Video rendering output
 video/frames/
 video/encode
+
+# Pitch deck video asset (large; re-made from video/)
+pitch/assets/*.mp4
+
+# Private pitch material: this repository is public
+pitch/pitch-notes.md
+pitch/deck/

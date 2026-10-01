@@ -1,5 +1,5 @@
 // Stitches numbered JPEG frames into an H.264 MP4 using macOS's built-in encoder (AVFoundation).
-// Usage: encode <frames-dir> <output.mp4> [fps]
+// Usage: encode <frames-dir> <output.mp4> [fps] [bitrate, bits per second; default 16000000]
 import AVFoundation
 import CoreGraphics
 import Foundation
@@ -10,6 +10,7 @@ guard args.count >= 3 else { print("usage: encode <frames-dir> <output.mp4> [fps
 let dir = URL(fileURLWithPath: args[1])
 let out = URL(fileURLWithPath: args[2])
 let fps = Int32(args.count > 3 ? Int(args[3])! : 30)
+let bitrate = args.count > 4 ? Int(args[4])! : 16_000_000
 let files = try FileManager.default.contentsOfDirectory(atPath: dir.path).filter { $0.hasSuffix(".jpg") }.sorted()
 guard let first = files.first,
       let src0 = CGImageSourceCreateWithURL(dir.appendingPathComponent(first) as CFURL, nil),
@@ -23,7 +24,7 @@ let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
   AVVideoWidthKey: w,
   AVVideoHeightKey: h,
   AVVideoCompressionPropertiesKey: [
-    AVVideoAverageBitRateKey: 16_000_000,
+    AVVideoAverageBitRateKey: bitrate,
     AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
     AVVideoMaxKeyFrameIntervalKey: 60
   ]
