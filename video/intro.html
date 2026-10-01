@@ -146,7 +146,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
           <div class="seg"><button aria-pressed="true">Live <span class="seg-count" id="liveCount">2</span></button><button>Yours</button><button>Results</button></div>
           <article class="call" id="c1">
             <div class="call-meta"><span class="avatar" style="background:var(--plum)">KE</span><span><b>King's E-Lab</b> · official call</span></div>
-            <h3>Will 50 of us go to the pub after the showcase?</h3>
+            <h3>Will 100 people come to E-Lab's formal dinner?</h3>
             <div class="chips" id="c1chips"><span class="chip">Result: Yes</span><span class="chip won">You called it: +20</span></div>
             <div class="bar bar-empty fc-locked" id="c1lock"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see what the crowd thinks</div>
             <div class="fc" id="c1fc">
@@ -172,7 +172,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
         <div class="pg">
           <h1 class="page-title">Ranks</h1>
           <p class="page-sub">Season 1 in King's E-Lab. Points land when a call is settled.</p>
-          <div class="banner"><span>★</span><span id="rkBanner"><b>You're 7th of 42.</b> Honest confidence scores best over a season.</span></div>
+          <div class="banner"><span>★</span><span id="rkBanner"><b>You're 7th of 52.</b> Honest confidence scores best over a season.</span></div>
           <div id="rows"></div>
         </div>
         <!-- Rewards -->
@@ -186,7 +186,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
             <span class="prize">★ Winner announced when the pilot ends</span>
             <div class="chal-actions"><button>See the leaderboard</button></div>
           </article>
-          <div class="banner"><span>★</span><span><b>You're 1st of 42</b> with 90 points. Top of the table: hold on to it!</span></div>
+          <div class="banner"><span>★</span><span><b>You're 1st of 52</b> with 90 points. Top of the table: hold on to it!</span></div>
         </div>
       </div></div>
       <nav class="nav" id="nav">
@@ -199,7 +199,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
       <div class="scrim" id="scrim"></div>
       <div class="sheet" id="sheet" style="visibility:visible">
         <div class="grab"></div>
-        <p class="sheet-q">Will 50 of us go to the pub after the showcase?</p>
+        <p class="sheet-q">Will 100 people come to E-Lab's formal dinner?</p>
         <h2>You're calling <span class="side-tag y">Yes</span></h2>
         <p class="lead">How sure are you?</p>
         <div class="conf">
@@ -218,7 +218,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
   <!-- big live forecast panel -->
   <div id="panel" class="abs">
     <div class="pm"><span class="avatar" style="background:var(--plum)">KE</span><span><b style="color:var(--ink)">King's E-Lab</b> · official call</span></div>
-    <h2>Will 50 of us go to the pub after the showcase?</h2>
+    <h2>Will 100 people come to E-Lab's formal dinner?</h2>
     <div class="prow">
       <span id="pNum">50%</span>
       <div><div class="plive" id="pLive"><i id="pDot"></i><span id="pLiveTxt">Updated live</span></div><div class="pwhat">chance it happens</div></div>
@@ -245,7 +245,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
     <p>For whoever tops the King's E-Lab leaderboard.</p>
     <span class="pill">★ Winner announced when the pilot ends</span>
   </div>
-  <div id="winStamp" class="abs stamp">Winner<small>Sam · 1st of 42 · 90 points</small></div>
+  <div id="winStamp" class="abs stamp">Winner<small>Sam · 1st of 52 · 90 points</small></div>
   <div id="tagline6" class="abs">Free to play. No money, nothing to buy. Just call it right.</div>
 
   <div id="particles"></div>
@@ -562,7 +562,7 @@ window.render = function (t) {
     $('rk' + i).textContent = (rs < .5 ? r0 : r1) + 1;
     S($('row' + i), { transform: `translateY(${y}px) ${p.me ? `scale(${1 + .04 * Math.sin(rs * Math.PI)})` : ''}`, zIndex: p.me ? 5 : 1 });
   });
-  $('rkBanner').innerHTML = t < 39.6 ? '<b>You\'re 7th of 42.</b> Honest confidence scores best over a season.' : '<b>You\'re 1st of 42.</b> Top of the table: hold on to it!';
+  $('rkBanner').innerHTML = t < 39.6 ? '<b>You\'re 7th of 52.</b> Honest confidence scores best over a season.' : '<b>You\'re 1st of 52.</b> Top of the table: hold on to it!';
 
   // ----- the prize card -----
   const pz = P(t, 45.0, 46.2, E.expo);

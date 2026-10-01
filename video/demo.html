@@ -152,7 +152,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
         <div class="pg">
           <h1 class="page-title">Communities</h1>
           <p class="page-sub">Each one has its own calls, table and prizes.</p>
-          <div class="comm" id="cm0"><span class="avatar" style="background:var(--plum)">KE</span><div class="ci"><b>King's E-Lab</b><span>42 people · 5 live calls</span></div><span class="go">›</span></div>
+          <div class="comm" id="cm0"><span class="avatar" style="background:var(--plum)">KE</span><div class="ci"><b>King's E-Lab</b><span>52 people · 5 live calls</span></div><span class="go">›</span></div>
           <div class="comm" id="cm1"><span class="avatar" style="background:#4B6CB7">TC</span><div class="ci"><b>Trinity College</b><span>612 people · 9 live calls</span></div><span class="go">›</span></div>
           <div class="comm" id="cm2"><span class="avatar" style="background:#B5487A">CU</span><div class="ci"><b>Cambridge Union</b><span>1,240 people · 7 live calls</span></div><span class="go">›</span></div>
           <div class="comm" id="cm3"><span class="avatar" style="background:#2E8E74">BC</span><div class="ci"><b>Boat Club</b><span>86 people · 4 live calls</span></div><span class="go">›</span></div>
@@ -167,7 +167,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
           <div id="c0wrap" style="overflow:hidden">
             <article class="call" id="c0">
               <div class="call-meta"><span class="avatar" style="background:var(--coral)">S</span><span><b>Sam (you)</b> · just approved</span></div>
-              <h3>Will 50 of us go to the pub after the showcase?</h3>
+              <h3>Will 100 people come to E-Lab's formal dinner?</h3>
               <div class="vote"><button class="yes">Yes</button><button class="no">No</button></div>
             </article>
           </div>
@@ -198,7 +198,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
         <div class="pg">
           <h1 class="page-title">Ranks</h1>
           <p class="page-sub">Season 1 in King's E-Lab. Points land when a call is settled.</p>
-          <div class="banner"><span>★</span><span id="rkBanner"><b>You're 7th of 42.</b> Honest confidence scores best over a season.</span></div>
+          <div class="banner"><span>★</span><span id="rkBanner"><b>You're 7th of 52.</b> Honest confidence scores best over a season.</span></div>
           <div id="rows"></div>
         </div>
         <!-- Rewards -->
@@ -211,7 +211,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
             <p>You topped the King's E-Lab table this week.</p>
             <div class="chal-actions"><button id="redeemBtn">Redeem in the shop</button></div>
           </article>
-          <div class="banner"><span>★</span><span><b>You're 1st of 42</b> with 90 points. Top of the table: hold on to it!</span></div>
+          <div class="banner"><span>★</span><span><b>You're 1st of 52</b> with 90 points. Top of the table: hold on to it!</span></div>
         </div>
       </div></div>
       <nav class="nav" id="nav">
@@ -283,7 +283,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
   <div id="bigRank" class="abs">
     <div class="later">A few good calls later…</div>
     <div class="n"><span id="brN">7</span><small id="brS">th</small></div>
-    <div class="of">of 42 in King's E-Lab</div>
+    <div class="of">of 52 in King's E-Lab</div>
   </div>
 
   <!-- big prize card -->
@@ -344,7 +344,7 @@ function curve(pts) {
 }
 
 // ---------- story data ----------
-const QUESTION = "Will 50 of us go to the pub after the showcase?";
+const QUESTION = "Will 100 people come to E-Lab's formal dinner?";
 const HISTORY = [50, 53, 51, 55, 58];          // the crowd before you (revealed when you call)
 const INCOMING = [61, 64, 60, 66, 69, 71];     // new calls arriving while you watch
 const T_IN = k => 21.4 + k * .62;
@@ -627,7 +627,7 @@ window.render = function (t) {
     $('rk' + i).textContent = (rs < .5 ? i : r1) + 1;
     S($('row' + i), { transform: `translateY(${L(i, r1, rs) * 58}px) ${p.me ? `scale(${1 + .04 * Math.sin(rs * Math.PI)})` : ''}`, zIndex: p.me ? 5 : 1 });
   });
-  $('rkBanner').innerHTML = t < 32.3 ? '<b>You\'re 7th of 42.</b> Honest confidence scores best over a season.' : '<b>You\'re 1st of 42.</b> Top of the table: hold on to it!';
+  $('rkBanner').innerHTML = t < 32.3 ? '<b>You\'re 7th of 52.</b> Honest confidence scores best over a season.' : '<b>You\'re 1st of 52.</b> Top of the table: hold on to it!';
   const brIn = P(t, 29.5, 30.3, E.expo), brOut = P(t, 34.6, 35.1, E.in);
   const rankNow = Math.max(1, Math.round(L(7, 1, rs)));
   $('brN').textContent = rankNow; $('brS').textContent = ORD[rankNow];
