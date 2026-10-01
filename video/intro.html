@@ -109,7 +109,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
     <p class="sub">The surer you are, the more you win if you're right, and the more you risk if you're wrong.</p>
   </div>
   <div id="cap3" class="cap" style="left:840px;top:64px;width:980px">
-    <p class="kick">03 — The crowd forecast</p>
+    <p class="kick">03 — The crowd</p>
     <h1 class="ttl s"><span class="ln"><span>Watch the crowd's odds</span></span><span class="ln"><span>move, live.</span></span></h1>
   </div>
   <div id="cap4" class="cap" style="left:840px;top:64px;width:980px">
@@ -146,9 +146,9 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
           <div class="seg"><button aria-pressed="true">Live <span class="seg-count" id="liveCount">2</span></button><button>Yours</button><button>Results</button></div>
           <article class="call" id="c1">
             <div class="call-meta"><span class="avatar" style="background:var(--plum)">KE</span><span><b>King's E-Lab</b> · official call</span></div>
-            <h3>Will the BNOC pitch be under 3 minutes?</h3>
+            <h3>Will 100 people come to Friday's bop?</h3>
             <div class="chips" id="c1chips"><span class="chip">Result: Yes</span><span class="chip won">You called it: +20</span></div>
-            <div class="bar bar-empty fc-locked" id="c1lock"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see the crowd forecast</div>
+            <div class="bar bar-empty fc-locked" id="c1lock"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see what the crowd thinks</div>
             <div class="fc" id="c1fc">
               <div class="fc-top">
                 <div class="fc-main"><div><span class="fc-num" id="c1num">50%</span></div><div class="fc-sub">chance it happens</div></div>
@@ -164,7 +164,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
           <article class="call">
             <div class="call-meta"><span class="avatar" style="background:var(--plum)">KE</span><span><b>King's E-Lab</b> · official call</span></div>
             <h3>Which pub will the cohort go to after formal?</h3>
-            <div class="bar bar-empty fc-locked"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see the crowd forecast</div>
+            <div class="bar bar-empty fc-locked"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Make your call to see what the crowd thinks</div>
             <div class="vote"><button class="yes">The Eagle</button><button class="no">The Bath House</button></div>
           </article>
         </div>
@@ -199,7 +199,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
       <div class="scrim" id="scrim"></div>
       <div class="sheet" id="sheet" style="visibility:visible">
         <div class="grab"></div>
-        <p class="sheet-q">Will the BNOC pitch be under 3 minutes?</p>
+        <p class="sheet-q">Will 100 people come to Friday's bop?</p>
         <h2>You're calling <span class="side-tag y">Yes</span></h2>
         <p class="lead">How sure are you?</p>
         <div class="conf">
@@ -218,7 +218,7 @@ html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EFEAF5
   <!-- big live forecast panel -->
   <div id="panel" class="abs">
     <div class="pm"><span class="avatar" style="background:var(--plum)">KE</span><span><b style="color:var(--ink)">King's E-Lab</b> · official call</span></div>
-    <h2>Will the BNOC pitch be under 3 minutes?</h2>
+    <h2>Will 100 people come to Friday's bop?</h2>
     <div class="prow">
       <span id="pNum">50%</span>
       <div><div class="plive" id="pLive"><i id="pDot"></i><span id="pLiveTxt">Updated live</span></div><div class="pwhat">chance it happens</div></div>
@@ -482,8 +482,8 @@ window.render = function (t) {
   $('c1foot').textContent = `${answered ? people : 10} people called it · ${settled ? 'Settled' : 'Closes today, 23:59'}`;
   $('pFoot').textContent = `${people} people called it · ${t >= 26.4 ? 'Closed today, 23:59' : 'Closes today, 23:59'}`;
   const closed = t >= 26.4;
-  $('c1liveTxt').textContent = closed ? 'Final forecast' : 'Updated live';
-  $('pLiveTxt').textContent = closed ? 'Final forecast' : 'Updated live';
+  $('c1liveTxt').textContent = closed ? 'Final odds' : 'Updated live';
+  $('pLiveTxt').textContent = closed ? 'Final odds' : 'Updated live';
   const pulse = closed ? 0 : .35 + .65 * (.5 + .5 * Math.cos(t * 3.5));
   S($('c1dotLive'), { opacity: pulse, display: closed ? 'none' : '' });
   S($('pDot'), { opacity: pulse, display: closed ? 'none' : '' });
