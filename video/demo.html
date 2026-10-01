@@ -657,18 +657,23 @@ window.render = function (t) {
 };
 
 // ---------- live playback (the pitch page calls these) ----------
-let raf = 0, t0 = 0;
-window.play = function (from = 0) {
+// The demo is five scenes. STOPS are the moments each one comes to rest, so a presenter can click through them.
+window.STOPS = [6.0, 14.0, 25.0, 34.3, 45];
+let raf = 0, t0 = 0, target = 0;
+window.__playing = false;
+window.playRange = function (from, to) {
   cancelAnimationFrame(raf);
-  t0 = performance.now() - from * 1000;
+  t0 = performance.now() - from * 1000; target = to; window.__playing = true;
   const loop = now => {
-    const t = Math.min(window.DURATION, (now - t0) / 1000);
+    const t = Math.min(to, (now - t0) / 1000);
     window.render(t);
-    if (t < window.DURATION) raf = requestAnimationFrame(loop);
+    if (t < to) raf = requestAnimationFrame(loop); else window.__playing = false;
   };
   raf = requestAnimationFrame(loop);
 };
-window.stop = function () { cancelAnimationFrame(raf); };
+window.play = function (from = 0) { window.playRange(from, window.DURATION); };
+window.finish = function () { cancelAnimationFrame(raf); window.__playing = false; window.render(target); };   // jump to the end of the scene
+window.stop = function () { cancelAnimationFrame(raf); window.__playing = false; };
 
 const start = () => { init(); render(0); if (window.parent === window && !/still/.test(location.hash)) play(); else if (window.__autoplay) play(); };
 (document.fonts && document.fonts.ready ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]) : Promise.resolve()).then(start);
