@@ -242,7 +242,7 @@ function publicState(all, me, cid = KE.id) {
   });
   const mine = me && board.find(r => r.id === me.id);
   const admin = isOwner(comm, me);
-  if (admin) calls.forEach(c => { c.canRemove = !c.yours; });
+  if (admin) calls.forEach(c => { c.canManage = true; });
   return {
     me: me ? { id: me.pid || me.id, name: me.name, email: me.email } : null,
     community: pub(comm),
@@ -407,24 +407,19 @@ async function postCall(st, me, body) {
 }
 
 // The person who asked gives the result (or cancels the call). Closing an open call locks answers at that moment.
+// The community's admin can do the same on anyone's call, and can also change or undo a result at any time.
 async function ownCall(st, me, id) {
   const call = await st.get(`call/${id}`, { type: 'json' });
-  if (!call || call.void) return { error: fail(404, "That call isn't available any more.") };
-  if (!call.author || call.author !== me.id) return { error: fail(400, 'Only the person who asked can close this call.') };
-  return { call };
+  if (!call || call.void) return { error: fail(410, "That call isn't available any more.") };
+  const admin = isOwner(findCommunity(await loadWorld(st), communityIdOf(call)), me);
+  if (!admin && (!call.author || call.author !== me.id)) return { error: fail(400, 'Only the person who asked can close this call.') };
+  return { call, admin };
 }
 
 async function closeOwnCall(st, me, id, body) {
-  // The community's admin can remove anyone's question (but only the asker gives a result).
-  const any = body.result === 'cancel' && await st.get(`call/${id}`, { type: 'json' });
-  if (any && !any.void && any.author !== me.id && isOwner(findCommunity(await loadWorld(st), communityIdOf(any)), me)) {
-    await st.setJSON(`call/${id}`, { ...any, void: true });
-    forget();
-    return json(200, { state: publicState(await loadWorld(st), me, communityIdOf(any)) });
-  }
-  const { call, error } = await ownCall(st, me, id);
+  const { call, admin, error } = await ownCall(st, me, id);
   if (error) return error;
-  if (resultOf(call) !== null) return fail(409, 'This call already has a result.');
+  if (resultOf(call) !== null && !admin) return fail(409, 'This call already has a result.');
   if (body.result === 'cancel') {
     call.void = true;
   } else {
@@ -442,10 +437,10 @@ async function closeOwnCall(st, me, id, body) {
 }
 
 async function undoOwnClose(st, me, id) {
-  const { call, error } = await ownCall(st, me, id);
+  const { call, admin, error } = await ownCall(st, me, id);
   if (error) return error;
   if (resultOf(call) === null) return fail(409, "This call doesn't have a result to undo.");
-  if (Date.now() - Date.parse(call.settledAt) > UNDO_MS) return fail(409, 'A result can only be undone in the first 15 minutes.');
+  if (!admin && Date.now() - Date.parse(call.settledAt) > UNDO_MS) return fail(409, 'A result can only be undone in the first 15 minutes.');
   call.result = null;
   call.settledAt = null;
   call.closedBy = null;

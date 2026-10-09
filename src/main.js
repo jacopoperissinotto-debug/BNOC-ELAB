@@ -238,8 +238,10 @@ function callCard(c) {
   } else if (c.canUndo) {
     owner = `<div class="owner done"><span>You closed this as <b>${esc(answer(c, c.result))}</b>.</span>
       <button data-act="undo-own" data-id="${c.id}">Undo</button></div>`;
-  } else if (c.canRemove) {
-    owner = `<button class="link-btn mod" data-act="remove-any" data-id="${c.id}">Remove this question (admin)</button>`;
+  } else if (c.canManage) {
+    // You run this community: close, settle, correct or remove anyone's question.
+    owner = `<div class="owner admin"><span><b>Admin.</b> ${c.status === 'settled' ? `Closed as ${esc(answer(c, c.result))}${c.closedBy ? ` by ${esc(c.closedBy)}` : ''}.` : c.status === 'open' ? 'You can close this for them.' : 'Still waiting for a result.'}</span>
+      <button data-act="close-own" data-id="${c.id}">${c.status === 'settled' ? 'Change' : c.status === 'open' ? 'Close it' : 'Give the result'}</button></div>`;
   }
   return `<article class="call ${c.yours ? 'yours' : ''}">
     <div class="call-meta">${meta}</div>
@@ -487,9 +489,13 @@ function openCloseOwn(id) {
   const c = S.state.calls.find(x => x.id === id);
   if (!c) return;
   S.closeCtx = { id, result: null };
-  openSheet(`<p class="sheet-q">${c.status === 'open' ? 'Close your question' : 'Your question has closed'}</p>
+  const settled = c.status === 'settled';
+  const top = settled ? 'Change the result' : !c.yours ? `Admin · ${esc(c.by)}'s question` : c.status === 'open' ? 'Close your question' : 'Your question has closed';
+  const lead = settled ? `It was closed as <b>${esc(answer(c, c.result))}</b>. Pick what really happened and everyone's points update straight away.`
+    : `What happened? ${c.status === 'open' ? 'Answers lock the moment you close it, and points go out straight away.' : 'Points go out as soon as you give the result.'}`;
+  openSheet(`<p class="sheet-q">${top}</p>
     <h2 id="sheet-title">${esc(c.q)}</h2>
-    <p class="lead">What happened? ${c.status === 'open' ? 'Answers lock the moment you close it, and points go out straight away.' : 'Points go out as soon as you give the result.'}</p>
+    <p class="lead">${lead}</p>
     <div class="vote pick-result" role="group" aria-label="What happened?">
       <button class="yes" data-act="pick-result" data-r="0" aria-pressed="false">${esc(answer(c, 0))}</button>
       <button class="no" data-act="pick-result" data-r="1" aria-pressed="false">${esc(answer(c, 1))}</button>
@@ -497,8 +503,9 @@ function openCloseOwn(id) {
     <div class="err" id="close-err" role="alert"></div>
     <button class="primary" data-act="confirm-close" disabled>Pick what happened</button>
     <button class="secondary" data-act="close">Not yet</button>
-    <button class="secondary danger" data-act="cancel-own">Cancel this question (nobody gets points)</button>
-    <p class="lead center" style="font-size:12.5px;margin:12px 0 0">Picked the wrong one? You can undo for 15 minutes.</p>`);
+    ${settled ? `<button class="secondary" data-act="undo-own" data-id="${c.id}">Take the result back (no points until it's closed again)</button>` : ''}
+    <button class="secondary danger" data-act="cancel-own">${c.yours ? 'Cancel' : 'Remove'} this question (nobody gets points)</button>
+    ${S.state.admin ? '' : '<p class="lead center" style="font-size:12.5px;margin:12px 0 0">Picked the wrong one? You can undo for 15 minutes.</p>'}`);
 }
 
 async function finishOwn(btn, result) {
@@ -519,7 +526,7 @@ async function undoOwn(btn, id) {
   btn.disabled = false;
   if (error) { toast(error); return refresh(); }
   S.state = data.state;
-  render();
+  closeSheet(); render();
   toast('Result undone. Close it again when you\'re ready.');
 }
 
@@ -559,17 +566,6 @@ async function newInvite(btn) {
   S.state = data.state;
   openCommunities();
   toast('New invite link ready');
-}
-
-async function removeAny(btn, id) {
-  if (!confirm('Remove this question? It disappears for everyone and nobody gets points.')) return;
-  btn.disabled = true;
-  const { data, error } = await api.closeCall(id, 'cancel');
-  btn.disabled = false;
-  if (error) return toast(error);
-  S.state = data.state;
-  render();
-  toast('Question removed');
 }
 
 function pickCommunity(id) {
@@ -759,7 +755,7 @@ document.addEventListener('click', e => {
       S.closeCtx.result = Number(b.dataset.r);
       document.querySelectorAll('[data-act="pick-result"]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
       const go = $('[data-act="confirm-close"]');
-      go.disabled = false; go.textContent = `Close it as ${b.textContent}`;
+      go.disabled = false; go.textContent = `${S.state.calls.find(x => x.id === S.closeCtx.id)?.status === 'settled' ? 'Set the result to' : 'Close it as'} ${b.textContent}`;
       break;
     }
     case 'confirm-close': if (S.closeCtx.result !== null) finishOwn(b, S.closeCtx.result); break;
@@ -769,7 +765,6 @@ document.addEventListener('click', e => {
     case 'choose-comm': chooseCommunity(id); break;
     case 'copy-invite': copyInvite(b); break;
     case 'new-invite': newInvite(b); break;
-    case 'remove-any': removeAny(b, id); break;
     case 'send-suggestion': sendSuggestion(b); break;
     case 'switch-comm': openCommunities(); break;
     case 'privacy': openPrivacy(); break;
