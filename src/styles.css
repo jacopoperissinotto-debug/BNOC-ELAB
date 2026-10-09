@@ -335,3 +335,27 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .my-odds{font-family:var(--display);font-weight:800;white-space:nowrap}
 .my-odds.pick-0{color:var(--coral-dark)}
 .my-odds.pick-1{color:var(--plum)}
+
+/* Member-run communities */
+.sub-h{font-family:var(--display);font-weight:700;font-size:14px;color:var(--muted);margin:18px 2px 10px;text-transform:none}
+.host-btn{margin-left:auto;flex:none;border:0;border-radius:999px;padding:7px 14px;background:var(--plum);color:#fff;font-weight:700;font-size:13px}
+.call.yours{border-color:var(--plum)}
+.owner{margin-top:12px;border:1.5px dashed var(--plum);background:var(--plum-soft);border-radius:14px;padding:10px 10px 10px 12px;font-size:13.5px;line-height:1.35;color:var(--plum);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.owner button{flex:none;border:0;border-radius:999px;padding:9px 14px;background:var(--plum);color:#fff;font-weight:800;font-size:13.5px;font-family:var(--display)}
+.owner button:hover{background:var(--plum-2)}
+.owner.done{border-style:solid;border-color:var(--line);background:var(--bg);color:var(--ink)}
+.owner.done button{background:transparent;color:var(--coral-dark);padding:4px 6px}
+.pick-result{margin:0 0 14px}
+.pick-result button{border:2px solid transparent;padding:16px 12px}
+.pick-result .yes[aria-pressed="true"]{background:var(--coral);color:#fff}
+.pick-result .no[aria-pressed="true"]{background:var(--plum);color:#fff}
+.comm-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 4px}
+.comm-row{display:flex;align-items:center;gap:12px;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:10px 14px;width:100%}
+.comm-row[aria-pressed="true"]{border-color:var(--plum);background:var(--plum-soft)}
+.comm-row .who{flex:1;line-height:1.3}
+.comm-row small{color:var(--muted);font-size:12.5px}
+.comm-row .tick{font-weight:800;color:var(--plum)}
+.field input[readonly]{font-size:13.5px;color:var(--muted)}
+.link-btn.mod{display:block;margin:10px auto 0;font-size:12.5px;color:var(--muted);font-weight:500;text-decoration:underline}
+.onboard .comm-list{margin-top:18px}
+.onboard .comm-row{color:var(--ink)}

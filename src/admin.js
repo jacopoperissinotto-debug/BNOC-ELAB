@@ -130,7 +130,8 @@ export async function refreshAdmin() {
   fillReward();
   await Promise.all([...A.openComments].map(fetchComments));
   const lists = root.querySelector('#admin-lists');
-  if (lists) lists.innerHTML = listsHtml();
+  // Don't redraw while someone is typing a new community's name.
+  if (lists && !['cm-new', 'cm-owner'].includes(document.activeElement?.id)) lists.innerHTML = listsHtml();
 }
 
 async function fetchComments(callId) {
@@ -181,7 +182,8 @@ function statusChip(c) {
 
 function callAdminCard(c, i, group) {
   // ↑/↓ reorder live (and closed) calls; settled ones sort themselves by when they were settled.
-  const mover = c.status === 'settled' ? '' : `<div class="move" role="group" aria-label="Move this call">
+  // Calls in member-run communities (c.by is who asked) aren't reordered from here.
+  const mover = c.status === 'settled' || c.by ? '' : `<div class="move" role="group" aria-label="Move this call">
       <button data-act="move" data-dir="up" data-id="${c.id}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
       <button data-act="move" data-dir="down" data-id="${c.id}" aria-label="Move down" ${i === group.length - 1 ? 'disabled' : ''}>↓</button>
     </div>`;
@@ -199,7 +201,7 @@ function callAdminCard(c, i, group) {
   }
   return `<article class="call">
     <div class="call-head">${mover}<h3>${esc(c.q)}</h3></div>
-    <div class="chips">${statusChip(c)}</div>
+    <div class="chips">${statusChip(c)}${c.by ? `<span class="chip">Asked by ${esc(c.by)}</span>` : ''}</div>
     <div class="call-foot"><span><b>${c.counts[0]}</b> ${esc(answer(c, 0))} · <b>${c.counts[1]}</b> ${esc(answer(c, 1))}${c.total ? ` · forecast ${c.forecast}% ${esc(answer(c, 0))}` : ''}</span><button class="report" data-act="remove" data-id="${c.id}">Remove call</button></div>
     ${action}
     <button class="link-btn" data-act="toggle-comments" data-id="${c.id}">${A.openComments.has(c.id) ? 'Hide' : 'Show'} comments (${c.comments})</button>
@@ -207,8 +209,35 @@ function callAdminCard(c, i, group) {
   </article>`;
 }
 
+const inviteLink = token => `${window.location.origin}/#/invite/${token}`;
+
+// Member-run communities: people get in with the invite link, post their own calls and close them.
+function communitiesHtml() {
+  const list = A.data.communities || [];
+  return `<h2 class="section-h">Member-run communities (${list.length})</h2>
+    <p class="page-sub" style="margin-bottom:10px">Invite-only groups where anyone can post a call and close their own. King's E-Lab above stays as it is.</p>
+    <div class="err" id="cm-new-err" role="alert"></div>
+    <div class="field"><label for="cm-new">New community</label><input type="text" id="cm-new" maxlength="30" placeholder="BNOC & CO"></div>
+    <div class="field"><label for="cm-owner">Who runs it (their Cambridge email)</label><input type="email" id="cm-owner" placeholder="crsid@cam.ac.uk">
+      <div class="hint">They're in without an invite, they share the invite link from the app, and they can remove any question.</div></div>
+    <button class="primary dark" data-act="new-community">Create community</button>
+    ${list.map(c => {
+      const calls = A.data.calls.filter(x => x.community === c.id);
+      return `<article class="call" style="margin-top:12px">
+        <div class="call-meta"><span><b>${esc(c.name)}</b> · run by ${esc(c.owner || 'nobody')} · ${c.members} ${c.members === 1 ? 'member' : 'members'} · ${c.calls} ${c.calls === 1 ? 'call' : 'calls'}</span></div>
+        <div class="field"><label for="inv-${c.id}">Invite link</label><input type="text" id="inv-${c.id}" readonly value="${esc(inviteLink(c.invite))}">
+          <div class="hint">Anyone who opens this link and joins BNOC gets in. Open it yourself to join too.</div></div>
+        <button class="primary" data-act="copy-invite" data-id="${c.id}">Copy invite link</button>
+        <div class="call-foot"><button class="link-btn" data-act="new-link" data-id="${c.id}">Make a new link</button>
+          <button class="report" data-act="remove-community" data-id="${c.id}">Remove community</button></div>
+      </article>
+      ${calls.map(x => callAdminCard(x, 0, [x])).join('')}`;
+    }).join('')}`;
+}
+
 function listsHtml() {
-  const { calls, suggestions, people } = A.data;
+  const { suggestions, people } = A.data;
+  const calls = A.data.calls.filter(c => c.community === 'ke');
   return `
     <h2 class="section-h">Calls (${calls.length})</h2>
     ${calls.length ? calls.map(c => {
@@ -223,6 +252,7 @@ function listsHtml() {
         <div class="chips"><span class="chip">${esc((s.options || ['Yes', 'No'])[0])}</span><span class="chip">${esc((s.options || ['Yes', 'No'])[1])}</span></div>
         <div class="vote"><button class="yes" data-act="publish" data-id="${s.id}">Publish</button><button class="no" data-act="reject" data-id="${s.id}">Reject</button></div>
       </article>`).join('') : '<div class="empty">No suggestions waiting.</div>'}
+    ${communitiesHtml()}
     <h2 class="section-h">People (${people.length})</h2>
     ${people.length ? people.map(p => `<div class="row"><span class="rank">${p.rank}</span><span class="who">${esc(p.name)}<br><span class="email">${esc(p.email || '')}</span></span><span class="sc">${p.score}</span><button class="report" data-act="remove-person" data-id="${p.id}" aria-label="Remove ${esc(p.name)}">Remove</button></div>`).join('') : '<div class="empty">Nobody has joined yet.</div>'}`;
 }
@@ -400,6 +430,40 @@ document.addEventListener('click', e => {
     case 'clear-reward':
       if (confirm('Take the reward down? The Rewards tab will say there\'s no reward right now.')) saveReward(b, true);
       break;
+    case 'new-community': {
+      const err = root.querySelector('#cm-new-err'), name = root.querySelector('#cm-new').value.trim();
+      const owner = root.querySelector('#cm-owner').value.trim();
+      clearError(err);
+      if (name.length < 2) return showError(err, 'Give the community a name.');
+      if (!/@cam\.ac\.uk$/i.test(owner)) return showError(err, "Add the @cam.ac.uk email of the person who'll run it.");
+      b.disabled = true;
+      api.admin.createCommunity(name, owner).then(({ data, error, status }) => {
+        b.disabled = false;
+        if (error) return status === 401 || status === 503 ? handleError(error, status) : showError(root.querySelector('#cm-new-err'), error);
+        A.data = data; root.querySelector('#admin-lists').innerHTML = listsHtml();
+        toast(`${name} created. Share its invite link.`);
+      });
+      break;
+    }
+    case 'copy-invite': {
+      const input = root.querySelector(`#inv-${CSS.escape(id)}`);
+      navigator.clipboard.writeText(input.value).then(() => toast('Invite link copied'), () => { input.select(); toast('Press and hold the link to copy it'); });
+      break;
+    }
+    case 'new-link':
+    case 'remove-community': {
+      const c = A.data?.communities.find(x => x.id === id), remove = b.dataset.act === 'remove-community';
+      if (!c || !confirm(remove
+        ? `Remove ${c.name}? Its ${c.calls} calls and its table disappear for everyone. This can't be undone.`
+        : `Make a new invite link for ${c.name}? The old link stops working. People already in stay in.`)) break;
+      b.disabled = true;
+      api.admin.updateCommunity(id, remove ? 'remove' : 'new-link').then(({ data, error, status }) => {
+        if (error) { b.disabled = false; return status === 401 || status === 503 ? handleError(error, status) : toast(error); }
+        A.data = data; root.querySelector('#admin-lists').innerHTML = listsHtml();
+        toast(remove ? `${c.name} removed` : 'New invite link ready');
+      });
+      break;
+    }
     case 'qr': showQr(); break;
     case 'qr-close': closeQr(); break;
   }

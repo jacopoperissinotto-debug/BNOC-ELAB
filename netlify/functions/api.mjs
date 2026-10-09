@@ -20,9 +20,18 @@
 //   suggestion/{id}            { id, q, options, uid, name, at }      options: two answers (missing = Yes/No)
 //   comment/{callId}/{at}.{uid}.{cid}  { cid, uid, pid, name, text, at }   comments on a call, oldest first
 //   config/reward              { prize, sponsor, who, when, details }       the prize on the Rewards page (set by admin)
+//
+// Communities. King's E-Lab ("ke") is built in: everyone is in it, the admin posts its calls.
+// Others are "member-run": you get in with an invite link, any member posts a call and it goes live
+// at once, and whoever asked closes it and gives the result themselves.
+//   community/{id}             { id, name, short, mode: 'open', invite, owner, createdAt }
+//                              owner = the email of the community's admin: in without an invite, shares the
+//                              invite link, can remove any question
+//   member/{communityId}/{uid}                          "this person is in this community"
+//   calls in a member-run community also carry { community, author, authorName, closedBy }
 import { getStore } from '@netlify/blobs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { CONF, isCamEmail, normaliseEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../../shared/rules.js';
+import { CONF, COMMUNITY, isCamEmail, normaliseEmail, CAM_ONLY_MSG, isBannedTopic, BANNED_MSG } from '../../shared/rules.js';
 
 export const config = { path: '/api/*' };
 
@@ -32,6 +41,7 @@ const clean = (s, max) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, m
 const json = (status, body) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
 });
+// (Not 403 or 404 for our own messages: Netlify can swap those replies for its own "Not found" page.)
 const fail = (status, error) => json(status, { error });
 
 // Every call has exactly two answers: Yes/No by default, or two labels the admin chose
@@ -48,6 +58,28 @@ const toPick = v => {
 };
 const resultOf = c => (c.result === null || c.result === undefined ? null : toPick(c.result));
 
+// ---------- Communities ----------
+const KE = { id: 'ke', name: COMMUNITY.name, short: COMMUNITY.short, mode: 'official' };
+const UNDO_MS = 15 * 60 * 1000;     // how long the person who closed a call can take the result back
+const communityIdOf = c => c.community || KE.id;
+const pub = c => ({ id: c.id, name: c.name, short: c.short, mode: c.mode });
+// "BNOC & CO" → "BC"
+const shortOf = name => {
+  const w = name.replace(/[^A-Za-z0-9 ]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  return ((w[0]?.[0] || '') + (w[1]?.[0] || w[0]?.[1] || '')).toUpperCase() || 'CO';
+};
+const findCommunity = (world, cid) => (cid === KE.id ? KE : world.communities.find(c => c.id === cid) || null);
+const isOwner = (comm, user) => !!user && !!comm?.owner && normaliseEmail(user.email) === comm.owner;
+const isMember = (world, cid, uid) => cid === KE.id || !!world.members.get(cid)?.has(uid);
+const myCommunities = (world, me) => [KE, ...world.communities
+  .filter(c => me && isMember(world, c.id, me.id)).sort((a, b) => a.name.localeCompare(b.name))];
+// The same world, narrowed to one community's calls and members (so scores never mix).
+const inCommunity = (world, cid) => ({
+  ...world,
+  calls: world.calls.filter(c => communityIdOf(c) === cid),
+  users: cid === KE.id ? world.users : world.users.filter(u => world.members.get(cid)?.has(u.id))
+});
+
 // ---------- Reading everything (small pilot: tens of people, a handful of calls) ----------
 // Kept for a few seconds so 20 phones refreshing at once don't each re-read the whole store.
 let cached = null;
@@ -61,17 +93,24 @@ async function keys(st, prefix) {
 
 async function loadWorld(st) {
   if (cached && Date.now() - cached.at < CACHE_MS) return cached.world;
-  const [callKeys, userKeys, fxKeys, commentKeys] = await Promise.all([
-    keys(st, 'call/'), keys(st, 'user/'), keys(st, 'fx/'), keys(st, 'comment/')
+  const [callKeys, userKeys, fxKeys, commentKeys, communityKeys, memberKeys] = await Promise.all([
+    keys(st, 'call/'), keys(st, 'user/'), keys(st, 'fx/'), keys(st, 'comment/'), keys(st, 'community/'), keys(st, 'member/')
   ]);
+  const members = new Map();
+  for (const k of memberKeys) {
+    const [, cid, uid] = k.split('/');
+    if (!members.has(cid)) members.set(cid, new Set());
+    members.get(cid).add(uid);
+  }
   const commentCounts = new Map();
   for (const k of commentKeys) {
     const callId = k.split('/')[1];
     commentCounts.set(callId, (commentCounts.get(callId) || 0) + 1);
   }
-  const [calls, users] = await Promise.all([
+  const [calls, users, communities] = await Promise.all([
     Promise.all(callKeys.map(k => st.get(k, { type: 'json' }))),
-    Promise.all(userKeys.map(k => st.get(k, { type: 'json' })))
+    Promise.all(userKeys.map(k => st.get(k, { type: 'json' }))),
+    Promise.all(communityKeys.map(k => st.get(k, { type: 'json' })))
   ]);
   // One answer per person per call: if two ever slip through at the same instant, the first one counts.
   const first = new Map();
@@ -84,7 +123,14 @@ async function loadWorld(st) {
   }
   const forecasts = [...first.values()];
   const reward = await st.get('config/reward', { type: 'json' });
-  const world = { calls: calls.filter(Boolean), users: users.filter(Boolean), forecasts, commentCounts, reward };
+  const world = { calls: calls.filter(Boolean), users: users.filter(Boolean), forecasts, commentCounts, reward, communities: communities.filter(Boolean), members };
+  // A community's admin is always a member of it, no invite needed.
+  for (const c of world.communities) {
+    const owner = c.owner && world.users.find(u => normaliseEmail(u.email) === c.owner);
+    if (!owner) continue;
+    if (!members.has(c.id)) members.set(c.id, new Set());
+    members.get(c.id).add(owner.id);
+  }
   cached = { at: Date.now(), world };
   return world;
 }
@@ -168,33 +214,48 @@ function tally(world, call) {
 const callSummary = (world, c) => ({
   id: c.id, q: c.q, options: optionsOf(c), closesAt: c.closesAt, status: statusOf(c), result: resultOf(c),
   comments: world.commentCounts.get(c.id) || 0,
+  by: c.authorName || null, closedBy: c.closedBy || null,     // member-run communities: who asked, who closed
   ...tally(world, c)
 });
 
 // What one person sees. Other people's individual answers and emails are never sent.
 // While a call is open, its crowd forecast (and the answer counts) are only revealed to people
 // who have already made that call, so nobody just copies the crowd.
-function publicState(world, me) {
+function publicState(all, me, cid = KE.id) {
+  // Asking for a community you're not in (or that's gone) quietly gives you King's E-Lab.
+  const wanted = me && findCommunity(all, cid);
+  const comm = wanted && isMember(all, wanted.id, me.id) ? wanted : KE;
+  const world = inCommunity(all, comm.id);
   const board = scoreboard(world);
+  const now = Date.now();
   const calls = world.calls.filter(c => !c.void).sort(callOrder).map(c => {
     const mineF = me && world.forecasts.find(f => f.callId === c.id && f.uid === me.id && inTime(f, c));
     const summary = callSummary(world, c);
     if (summary.status === 'open' && !mineF) Object.assign(summary, { counts: null, forecast: null, trend: [], hidden: true });
+    const yours = !!me && !!c.author && c.author === me.id;
     return {
       ...summary,
+      yours,
+      canUndo: yours && summary.status === 'settled' && now - Date.parse(c.settledAt) < UNDO_MS,
       mine: mineF ? { pick: mineF.pick, conf: mineF.conf, pts: pointsFor(mineF, c) } : null
     };
   });
   const mine = me && board.find(r => r.id === me.id);
+  const admin = isOwner(comm, me);
+  if (admin) calls.forEach(c => { c.canRemove = !c.yours; });
   return {
     me: me ? { id: me.pid || me.id, name: me.name, email: me.email } : null,
+    community: pub(comm),
+    communities: myCommunities(all, me).map(pub),
+    admin,                                                  // you run this community
+    invite: admin ? comm.invite : null,                     // only its admin shares the invite link
     calls,
     board: board.map(({ pid, name, score, rank }) => ({ id: pid, name, score, rank })),
     score: mine?.score || 0,
     rank: mine?.rank || 0,
     people: board.length,
     settled: calls.filter(c => c.status === 'settled').length,
-    reward: world.reward || null
+    reward: comm.id === KE.id ? all.reward || null : null
   };
 }
 
@@ -257,7 +318,9 @@ async function deleteUser(st, me) {
   const mine = (await keys(st, 'fx/')).filter(k => k.split('/')[2] === me.id);
   const suggestions = await Promise.all((await keys(st, 'suggestion/')).map(k => st.get(k, { type: 'json' })));
   const comments = (await keys(st, 'comment/')).filter(k => k.split('/')[2].split('.')[1] === me.id);
+  const memberships = (await keys(st, 'member/')).filter(k => k.split('/')[2] === me.id);
   const toDelete = [
+    ...memberships,
     `user/${me.id}`,
     `email/${sha(me.email)}`,
     ...(me.sessions || []).map(h => `session/${h}`),
@@ -279,6 +342,7 @@ async function forecast(st, me, body) {
   if (!call || call.void) return fail(404, "That call isn't available any more.");
   if (pick === null || pick >= optionsOf(call).length) return fail(400, 'Pick one of the answers.');
   if (statusOf(call) !== 'open') return fail(409, 'This call has closed, so answers are locked.');
+  if (!isMember(await loadWorld(st), communityIdOf(call), me.id)) return fail(400, "This call is in a community you haven't joined.");
 
   const at = Date.now();
   const first = await st.setJSON(`f/${call.id}/${me.id}`, { pick, conf, at }, { onlyIfNew: true });
@@ -290,7 +354,104 @@ async function forecast(st, me, body) {
     throw err;
   }
   forget();
-  return json(200, { state: publicState(await loadWorld(st), me) });
+  return json(200, { state: publicState(await loadWorld(st), me, communityIdOf(call)) });
+}
+
+// ---------- Member-run communities: join by invite, post your own calls, close them yourself ----------
+async function joinCommunity(st, me, body) {
+  const token = clean(body.invite, 60);
+  const comm = token && (await loadWorld(st)).communities.find(c => c.invite === token);
+  if (!comm) return fail(410, "That invite link doesn't work any more. Ask for a new one.");
+  await st.set(`member/${comm.id}/${me.id}`, '1');
+  forget();
+  return json(200, { community: pub(comm), state: publicState(await loadWorld(st), me, comm.id) });
+}
+
+// The community's admin can swap the invite link for a new one (the old one stops working).
+async function newInvite(st, me, cid) {
+  const comm = await st.get(`community/${cid}`, { type: 'json' });
+  if (!comm || !isOwner(comm, me)) return fail(400, "Only the community's admin can change the invite link.");
+  comm.invite = newId() + newId();
+  await st.setJSON(`community/${cid}`, comm);
+  forget();
+  return json(200, { state: publicState(await loadWorld(st), me, cid) });
+}
+
+const MAX_OPEN_OWN = 10;          // calls one person can have waiting for a result
+const POST_GAP_MS = 10000;        // one new call every few seconds per person
+const MAX_AHEAD_MS = 60 * 864e5;  // a call can stay open for at most 60 days
+
+async function postCall(st, me, body) {
+  const world = await loadWorld(st);
+  const comm = findCommunity(world, String(body.c || ''));
+  if (!comm || comm.mode !== 'open' || !isMember(world, comm.id, me.id)) return fail(400, 'You can only post calls in a member-run community you belong to.');
+  let q = clean(body.q, 140);
+  const closesAt = parseClose(body.closesAt);
+  const { options, error } = parseOptions(body.options);
+  if (q.length < 10) return fail(400, 'Write a full question (at least 10 characters).');
+  if (error) return fail(400, error);
+  if (isBannedTopic(q) || (options || []).some(isBannedTopic)) return fail(422, BANNED_MSG);
+  if (!closesAt || Date.parse(closesAt) <= Date.now()) return fail(400, 'Pick a closing time in the future.');
+  if (Date.parse(closesAt) > Date.now() + MAX_AHEAD_MS) return fail(400, 'A call can stay open for 60 days at most.');
+  const own = world.calls.filter(c => communityIdOf(c) === comm.id && c.author === me.id && !c.void);
+  if (own.filter(c => resultOf(c) === null).length >= MAX_OPEN_OWN) return fail(429, `You have ${MAX_OPEN_OWN} calls waiting for a result. Close some first.`);
+  if (own.some(c => Date.now() - Date.parse(c.createdAt) < POST_GAP_MS)) return fail(429, 'Slow down a little: wait a few seconds between calls.');
+  if (!q.endsWith('?')) q += '?';
+  const call = {
+    id: newId(), q, options, closesAt, createdAt: new Date().toISOString(), result: null, settledAt: null, void: false,
+    community: comm.id, author: me.id, authorName: me.name, closedBy: null
+  };
+  await st.setJSON(`call/${call.id}`, call);
+  forget();
+  return json(200, { state: publicState(await loadWorld(st), me, comm.id) });
+}
+
+// The person who asked gives the result (or cancels the call). Closing an open call locks answers at that moment.
+async function ownCall(st, me, id) {
+  const call = await st.get(`call/${id}`, { type: 'json' });
+  if (!call || call.void) return { error: fail(404, "That call isn't available any more.") };
+  if (!call.author || call.author !== me.id) return { error: fail(400, 'Only the person who asked can close this call.') };
+  return { call };
+}
+
+async function closeOwnCall(st, me, id, body) {
+  // The community's admin can remove anyone's question (but only the asker gives a result).
+  const any = body.result === 'cancel' && await st.get(`call/${id}`, { type: 'json' });
+  if (any && !any.void && any.author !== me.id && isOwner(findCommunity(await loadWorld(st), communityIdOf(any)), me)) {
+    await st.setJSON(`call/${id}`, { ...any, void: true });
+    forget();
+    return json(200, { state: publicState(await loadWorld(st), me, communityIdOf(any)) });
+  }
+  const { call, error } = await ownCall(st, me, id);
+  if (error) return error;
+  if (resultOf(call) !== null) return fail(409, 'This call already has a result.');
+  if (body.result === 'cancel') {
+    call.void = true;
+  } else {
+    const result = toPick(body.result);
+    if (result === null || result >= optionsOf(call).length) return fail(400, 'Pick the answer that happened.');
+    const now = new Date().toISOString();
+    if (statusOf(call) === 'open') call.closesAt = now;
+    call.result = result;
+    call.settledAt = now;
+    call.closedBy = me.name;
+  }
+  await st.setJSON(`call/${id}`, call);
+  forget();
+  return json(200, { state: publicState(await loadWorld(st), me, communityIdOf(call)) });
+}
+
+async function undoOwnClose(st, me, id) {
+  const { call, error } = await ownCall(st, me, id);
+  if (error) return error;
+  if (resultOf(call) === null) return fail(409, "This call doesn't have a result to undo.");
+  if (Date.now() - Date.parse(call.settledAt) > UNDO_MS) return fail(409, 'A result can only be undone in the first 15 minutes.');
+  call.result = null;
+  call.settledAt = null;
+  call.closedBy = null;
+  await st.setJSON(`call/${id}`, call);
+  forget();
+  return json(200, { state: publicState(await loadWorld(st), me, communityIdOf(call)) });
 }
 
 async function suggest(st, me, body) {
@@ -333,6 +494,7 @@ async function addComment(st, me, callId, body) {
   if (isBannedTopic(text)) return fail(422, "This comment can't be posted. BNOC doesn't allow comments about relationships, health, appearance or grades.");
   const call = await st.get(`call/${callId}`, { type: 'json' });
   if (!call || call.void) return fail(404, "That call isn't available any more.");
+  if (!isMember(await loadWorld(st), communityIdOf(call), me.id)) return fail(400, "This call is in a community you haven't joined.");
   const now = Date.now();
   const recent = (await keys(st, `comment/${callId}/`)).some(k => {
     const [at, uid] = k.split('/')[2].split('.');
@@ -348,7 +510,7 @@ async function addComment(st, me, callId, body) {
 async function removeComment(st, callId, commentId, me, admin) {
   const key = await findCommentKey(st, callId, commentId);
   if (!key) return fail(404, 'That comment has already gone.');
-  if (!admin && key.split('/')[2].split('.')[1] !== me?.id) return fail(403, 'You can only delete your own comments.');
+  if (!admin && key.split('/')[2].split('.')[1] !== me?.id) return fail(400, 'You can only delete your own comments.');
   await st.delete(key);
   forget();
   return json(200, { comments: await listComments(st, callId, me) });
@@ -381,11 +543,19 @@ function parseClose(v) {
 async function adminState(st) {
   forget();
   const world = await loadWorld(st);
-  const board = scoreboard(world);
+  const board = scoreboard(inCommunity(world, KE.id));
   const suggestions = (await Promise.all((await keys(st, 'suggestion/')).map(k => st.get(k, { type: 'json' }))))
     .filter(Boolean).sort((a, b) => b.at.localeCompare(a.at));
+  const nameOf = cid => findCommunity(world, cid)?.name || 'A removed community';
   return json(200, {
-    calls: world.calls.filter(c => !c.void).sort(callOrder).map(c => callSummary(world, c)),
+    calls: world.calls.filter(c => !c.void).sort(callOrder).map(c => ({
+      ...callSummary(world, c), community: communityIdOf(c), communityName: nameOf(communityIdOf(c))
+    })),
+    communities: world.communities.sort((a, b) => a.name.localeCompare(b.name)).map(c => ({
+      ...pub(c), invite: c.invite, owner: c.owner || '',
+      members: world.members.get(c.id)?.size || 0,
+      calls: world.calls.filter(x => !x.void && communityIdOf(x) === c.id).length
+    })),
     suggestions,
     reward: world.reward || null,
     people: board.map(({ id, name, score, rank }) => ({ id, name, score, rank, email: world.users.find(u => u.id === id)?.email }))
@@ -418,11 +588,46 @@ async function createCall(st, body) {
   return adminState(st);
 }
 
+// Member-run communities are set up here; people then get in with the invite link.
+async function createCommunity(st, body) {
+  const name = clean(body.name, 30);
+  const owner = normaliseEmail(body.owner || '');
+  if (name.length < 2) return fail(400, 'Give the community a name.');
+  if (!isCamEmail(owner)) return fail(400, "Add the @cam.ac.uk email of the person who'll run it.");
+  const world = await loadWorld(st);
+  if ([KE, ...world.communities].some(c => c.name.toLowerCase() === name.toLowerCase())) return fail(409, 'There is already a community with that name.');
+  const comm = { id: newId(), name, short: shortOf(name), mode: 'open', invite: newId() + newId(), owner, createdAt: new Date().toISOString() };
+  await st.setJSON(`community/${comm.id}`, comm);
+  forget();
+  return adminState(st);
+}
+
+async function updateCommunity(st, id, body) {
+  const comm = await st.get(`community/${id}`, { type: 'json' });
+  if (!comm) return fail(404, 'Community not found.');
+  if (body.action === 'new-link') {
+    comm.invite = newId() + newId();     // the old link stops working; people already in stay in
+    await st.setJSON(`community/${id}`, comm);
+  } else if (body.action === 'remove') {
+    const world = await loadWorld(st);
+    const gone = world.calls.filter(c => communityIdOf(c) === id);
+    await Promise.all([
+      st.delete(`community/${id}`),
+      ...(await keys(st, `member/${id}/`)).map(k => st.delete(k)),
+      ...gone.map(c => st.setJSON(`call/${c.id}`, { ...c, void: true }))
+    ]);
+  } else {
+    return fail(400, 'Unknown action.');
+  }
+  forget();
+  return adminState(st);
+}
+
 // Swap a call with its neighbour in the list (same group: live or closed).
 async function moveCall(st, call, direction) {
   forget();
   const world = await loadWorld(st);
-  const group = world.calls.filter(c => !c.void && statusOf(c) === statusOf(call)).sort(callOrder);
+  const group = world.calls.filter(c => !c.void && communityIdOf(c) === communityIdOf(call) && statusOf(c) === statusOf(call)).sort(callOrder);
   const i = group.findIndex(c => c.id === call.id);
   const j = direction === 'up' ? i - 1 : i + 1;
   if (i < 0 || j < 0 || j >= group.length) return adminState(st);
@@ -494,6 +699,8 @@ export default async (req) => {
         return adminState(st);
       }
       if (route === 'POST admin/reward') return saveReward(st, body);
+      if (route === 'POST admin/communities' && !parts[2]) return createCommunity(st, body);
+      if (route === 'POST admin/communities' && parts[2]) return updateCommunity(st, parts[2], body);
       if (route === 'GET admin/comments' && parts[2]) return json(200, { comments: await listComments(st, parts[2], null) });
       if (route === 'POST admin/comments' && parts[2] && parts[3]) return removeComment(st, parts[2], parts[3], null, true);
       if (route === 'POST admin/suggestions' && parts[2]) {
@@ -509,7 +716,7 @@ export default async (req) => {
     if (route === 'GET state') {
       // Readable from other pages too (the pitch slides show the live player and call counts).
       // It carries no login cookie, so another site only ever sees what a signed-out visitor sees.
-      const res = json(200, publicState(await loadWorld(st), me));
+      const res = json(200, publicState(await loadWorld(st), me, new URL(req.url).searchParams.get('c') || KE.id));
       res.headers.set('access-control-allow-origin', '*');
       return res;
     }
@@ -517,9 +724,17 @@ export default async (req) => {
     if (route === 'POST forecast') return forecast(st, me, body);
     if (route === 'POST suggest') return suggest(st, me, body);
     if (route === 'POST delete-me') { await deleteUser(st, me); return json(200, { ok: true }); }
+    if (route === 'POST communities/join') return joinCommunity(st, me, body);
+    if (req.method === 'POST' && parts[0] === 'communities' && parts[2] === 'new-link') return newInvite(st, me, parts[1]);
+    // Member-run communities: /api/calls posts one, /api/calls/{id}/close and /undo are for whoever asked it.
+    if (req.method === 'POST' && parts[0] === 'calls' && !parts[1]) return postCall(st, me, body);
+    if (req.method === 'POST' && parts[0] === 'calls' && parts[2] === 'close') return closeOwnCall(st, me, parts[1], body);
+    if (req.method === 'POST' && parts[0] === 'calls' && parts[2] === 'undo') return undoOwnClose(st, me, parts[1]);
     // Comments are for members only: /api/comments/{callId}, and /api/comments/{callId}/{commentId} to delete your own.
     if (parts[0] === 'comments' && parts[1]) {
       const [, callId, commentId] = parts;
+      const call = await st.get(`call/${callId}`, { type: 'json' });
+      if (call && !isMember(await loadWorld(st), communityIdOf(call), me.id)) return fail(400, "This call is in a community you haven't joined.");
       if (req.method === 'GET' && !commentId) return json(200, { comments: await listComments(st, callId, me) });
       if (req.method === 'POST' && !commentId) return addComment(st, me, callId, body);
       if (req.method === 'POST' && commentId) return removeComment(st, callId, commentId, me, false);

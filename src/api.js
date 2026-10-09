@@ -29,10 +29,16 @@ async function call(method, path, body, { admin = false } = {}) {
 }
 
 export const api = {
-  state: () => call('GET', 'state'),
+  state: c => call('GET', c && c !== 'ke' ? `state?c=${encodeURIComponent(c)}` : 'state'),
   join: (name, email) => call('POST', 'join', { name, email }),
   forecast: (callId, pick, conf) => call('POST', 'forecast', { callId, pick, conf }),
   suggest: (q, options) => call('POST', 'suggest', { q, options }),
+  // Member-run communities
+  joinCommunity: invite => call('POST', 'communities/join', { invite }),
+  newInvite: c => call('POST', `communities/${c}/new-link`, {}),
+  postCall: (c, q, options, closesAt) => call('POST', 'calls', { c, q, options, closesAt }),
+  closeCall: (id, result) => call('POST', `calls/${id}/close`, { result }),
+  undoClose: id => call('POST', `calls/${id}/undo`, {}),
   deleteMe: () => call('POST', 'delete-me', {}),
   comments: callId => call('GET', `comments/${callId}`),
   addComment: (callId, text) => call('POST', `comments/${callId}`, { text }),
@@ -44,6 +50,8 @@ export const api = {
     rejectSuggestion: id => call('POST', `admin/suggestions/${id}`, {}, { admin: true }),
     removePerson: id => call('POST', `admin/people/${id}`, {}, { admin: true }),
     saveReward: reward => call('POST', 'admin/reward', reward, { admin: true }),
+    createCommunity: (name, owner) => call('POST', 'admin/communities', { name, owner }, { admin: true }),
+    updateCommunity: (id, action) => call('POST', `admin/communities/${id}`, { action }, { admin: true }),
     comments: callId => call('GET', `admin/comments/${callId}`, null, { admin: true }),
     removeComment: (callId, commentId) => call('POST', `admin/comments/${callId}/${commentId}`, {}, { admin: true })
   }
