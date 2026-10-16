@@ -360,3 +360,4 @@ input[type=range]{width:100%;accent-color:var(--coral);margin:10px 0 12px}
 .owner.admin button{background:var(--coral-dark)}
 .onboard .comm-list{margin-top:18px}
 .onboard .comm-row{color:var(--ink)}
+.my-stake .my-odds{white-space:normal;text-align:right}

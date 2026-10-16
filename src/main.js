@@ -221,9 +221,10 @@ function callCard(c) {
     action = `<div class="vote"><button class="yes" data-act="call" data-id="${c.id}" data-pick="0">${esc(answer(c, 0))}</button><button class="no" data-act="call" data-id="${c.id}" data-pick="1">${esc(answer(c, 1))}</button></div>`;
   } else if (c.mine && c.status !== 'settled') {
     const cf = CONF[c.mine.conf];
-    // Your personal odds: the crowd's chance of the answer you picked, in that answer's colour.
+    // The crowd's chance of the answer you picked, in that answer's colour, named so it can't be
+    // mistaken for a second, different forecast (the big number above is always the first answer).
     const myPct = c.forecast === null || c.forecast === undefined ? null : c.mine.pick === 0 ? c.forecast : 100 - c.forecast;
-    const right = myPct === null ? '<span class="locked">Locked in</span>' : `<span class="my-odds pick-${c.mine.pick}">${myPct}% chance</span>`;
+    const right = myPct === null ? '<span class="locked">Locked in</span>' : `<span class="my-odds pick-${c.mine.pick}">Crowd: ${myPct}% ${esc(answer(c, c.mine.pick))}</span>`;
     action = `<div class="my-stake"><span>You called ${tag(c, c.mine.pick)} · ${cf.label}</span>${right}</div>`;
   }
   const when = c.status === 'open' ? `Closes ${fmtWhen(c.closesAt)}` : c.status === 'closed' ? `Closed ${fmtWhen(c.closesAt)}` : 'Settled';
