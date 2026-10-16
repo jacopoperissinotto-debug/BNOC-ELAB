@@ -390,7 +390,7 @@ async function postCall(st, me, body) {
   const { options, error } = parseOptions(body.options);
   if (q.length < 10) return fail(400, 'Write a full question (at least 10 characters).');
   if (error) return fail(400, error);
-  if (isBannedTopic(q) || (options || []).some(isBannedTopic)) return fail(422, BANNED_MSG);
+  // No banned-topic filter in member-run communities for now: the beta runs inside the team.
   if (!closesAt || Date.parse(closesAt) <= Date.now()) return fail(400, 'Pick a closing time in the future.');
   if (Date.parse(closesAt) > Date.now() + MAX_AHEAD_MS) return fail(400, 'A call can stay open for 60 days at most.');
   const own = world.calls.filter(c => communityIdOf(c) === comm.id && c.author === me.id && !c.void);
@@ -486,10 +486,11 @@ async function findCommentKey(st, callId, commentId) {
 async function addComment(st, me, callId, body) {
   const text = clean(body.text, COMMENT_MAX);
   if (!text) return fail(400, 'Write something first.');
-  if (isBannedTopic(text)) return fail(422, "This comment can't be posted. BNOC doesn't allow comments about relationships, health, appearance or grades.");
   const call = await st.get(`call/${callId}`, { type: 'json' });
   if (!call || call.void) return fail(404, "That call isn't available any more.");
   if (!isMember(await loadWorld(st), communityIdOf(call), me.id)) return fail(400, "This call is in a community you haven't joined.");
+  // The banned-topic filter only applies in King's E-Lab (member-run communities are team-only for now).
+  if (communityIdOf(call) === KE.id && isBannedTopic(text)) return fail(422, "This comment can't be posted. BNOC doesn't allow comments about relationships, health, appearance or grades.");
   const now = Date.now();
   const recent = (await keys(st, `comment/${callId}/`)).some(k => {
     const [at, uid] = k.split('/')[2].split('.');

@@ -380,7 +380,7 @@ async function postComment(btn) {
   const text = $('#cm-text').value.trim(), err = $('#cm-err');
   clearError(err);
   if (!text) return showError(err, 'Write something first.');
-  if (isBannedTopic(text)) return showError(err, "This comment can't be posted. BNOC doesn't allow comments about relationships, health, appearance or grades.");
+  if (!isOpen() && isBannedTopic(text)) return showError(err, "This comment can't be posted. BNOC doesn't allow comments about relationships, health, appearance or grades.");
   btn.disabled = true;
   const { data, error } = await api.addComment(S.commentsFor, text);
   btn.disabled = false;
@@ -452,7 +452,7 @@ function openAsk() {
     <p class="lead">It goes live for everyone in ${esc(comm().name)} straight away. You close it and give the result.</p>
     <div class="err" id="ask-err" role="alert"></div>
     <div class="field"><label for="ask-q">Your question</label><textarea id="ask-q" maxlength="140" placeholder="Will more than 10 of us make it to Friday's social?"></textarea>
-      <div class="hint">Not allowed: relationships, health, appearance or grades.</div></div>
+      </div>
     <div class="field"><label id="ask-ans-l">The two answers</label>
       <div class="pair" role="group" aria-labelledby="ask-ans-l">
         <input type="text" id="ask-a0" maxlength="20" value="Yes" aria-label="First answer">
@@ -474,7 +474,6 @@ async function sendAsk(btn) {
   if (q.length < 10) return showError(err, 'Write a full question, like "Will we finish the deck by Thursday?"');
   if (!options[0] || !options[1]) return showError(err, 'Fill in both answers.');
   if (options[0].toLowerCase() === options[1].toLowerCase()) return showError(err, 'The two answers need to be different.');
-  if ([q, ...options].some(isBannedTopic)) return showError(err, BANNED_MSG);
   if (!when || when <= new Date()) return showError(err, 'Pick a closing time in the future.');
   btn.disabled = true;
   const { data, error } = await api.postCall(comm().id, q, options, when.toISOString());
@@ -639,7 +638,7 @@ function renderHow() {
       <b>3. Climb the table.</b> You never put points in, so you can't lose anything you own. The points are set so that saying how sure you really are always scores best.<br><br>
       Points can't be bought, sold or cashed out.</div>
     ${open ? `<div class="rules"><b>This community runs itself.</b> Tap + to ask a question: it goes live for everyone in ${name} straight away. On your own questions you'll see a "Close it" button, and the Asked tab lists everything you've asked. Each community has its own table, so points here don't mix with other communities.</div>` : ''}
-    <div class="rules"><b>House rules.</b> No calls about relationships, health, appearance or grades. ${open ? 'Be fair when you close your own question: everyone can see who closed it.' : 'Tap + to suggest a call; the E-Lab team checks every suggestion.'}</div>
+    <div class="rules"><b>House rules.</b> ${open ? 'Be fair when you close your own question: everyone can see who closed it.' : 'No calls about relationships, health, appearance or grades. Tap + to suggest a call; the E-Lab team checks every suggestion.'}</div>
     <button class="secondary" data-act="privacy">Privacy notice</button>`;
 }
 
