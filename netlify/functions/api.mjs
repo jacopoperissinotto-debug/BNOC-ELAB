@@ -182,13 +182,36 @@ function callOrder(a, b) {
 // shows the shape without revealing each individual call.
 const sample = (arr, n) => arr.length <= n ? arr : Array.from({ length: n }, (_, k) => arr[Math.round(k * (arr.length - 1) / (n - 1))]);
 
-// How many people picked each answer, plus the crowd forecast: the average of everyone's
-// calls as probabilities. "Certain: Yes" counts as 90% Yes, "Hunch: No" as 40% Yes, and so on,
-// so surer calls move it more. Every call also starts with two invisible "don't know" (50%)
-// votes, so a handful of early calls nudge the forecast instead of swinging it to an extreme.
-// `forecast` is the % chance of the first answer; `trend` is how it moved from the 50% start
-// (from the first call, smoothed to at most 12 points). Phones only get it once they've called.
+// How many people picked each answer, plus the crowd forecast (the % chance of the first answer).
+// Each call counts as a probability: "Certain: Yes" is 90% Yes, "Hunch: No" is 40% Yes, and so on.
+//  - They're combined as log-odds (the standard way to pool forecasts), so when people agree the
+//    number moves further than a plain average would let it, and one doubter doesn't cancel out a crowd.
+//  - The more independent calls agree, the further it's allowed to go ("extremising", up to 1.5x
+//    from 10 calls), because ten people agreeing is stronger evidence than two.
+//  - Calls made close to the deadline count up to twice as much: people answering later usually know more.
+//  - Every call starts with two invisible "don't know" (50%) votes, so a handful of early calls
+//    nudge the forecast instead of swinging it to an extreme. It never shows below 3% or above 97%.
+// `trend` is how it moved from the 50% start (from the first call, smoothed to at most 12 points).
+// Phones only get it once they've called.
 const PRIOR_VOTES = 2;
+const LATE_HOURS = 48;        // calls in the last 48 hours before closing count more, up to double at the end
+const EXTREMISE_MAX = 1.5;
+const logit = p => Math.log(p / (1 - p));
+const lateWeight = (f, call) => {
+  const hoursLeft = (Date.parse(call.closesAt) - f.at) / 36e5;
+  return 1 + Math.min(1, Math.max(0, 1 - hoursLeft / LATE_HOURS));
+};
+function pool(fs, call) {
+  let num = 0, den = PRIOR_VOTES;     // the prior votes sit at 50%, i.e. log-odds 0
+  for (const f of fs) {
+    const p = CONF[f.conf].p, w = lateWeight(f, call);
+    num += w * logit(f.pick === 0 ? p : 1 - p);
+    den += w;
+  }
+  const a = 1 + (EXTREMISE_MAX - 1) * Math.min(1, fs.length / 10);
+  const pct = 100 / (1 + Math.exp(-a * num / den));
+  return Math.min(97, Math.max(3, Math.round(pct)));
+}
 
 function tally(world, call) {
   const counts = optionsOf(call).map(() => 0);
@@ -196,12 +219,9 @@ function tally(world, call) {
     .filter(f => f.callId === call.id && inTime(f, call) && f.pick < counts.length)
     .sort((a, b) => a.at - b.at);
   const path = [50];
-  let sum = PRIOR_VOTES * 0.5;
   fs.forEach((f, i) => {
     counts[f.pick]++;
-    const p = CONF[f.conf].p;
-    sum += f.pick === 0 ? p : 1 - p;
-    path.push(Math.round(sum / (i + 1 + PRIOR_VOTES) * 100));
+    path.push(pool(fs.slice(0, i + 1), call));
   });
   return {
     counts,

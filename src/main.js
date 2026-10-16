@@ -633,7 +633,7 @@ function renderHow() {
     <p class="page-sub">Forecasting, not betting. There's no money anywhere.</p>
     <div class="rules"><b>1. Make a call.</b> Pick one of the two answers (usually Yes or No) on a question about ${name}, and say how sure you are:
       ${scoringTable()}
-      <b>The crowd forecast</b> on each call averages everyone's calls, weighted by how sure they were: a Certain call moves it more than a Hunch. You see it once you've made your call.<br>
+      <b>The crowd forecast</b> on each call combines everyone's calls, weighted by how sure they were: a Certain call moves it more than a Hunch, the more people agree the further it moves, and calls made close to the deadline count a bit more. You see it once you've made your call.<br>
       <b>2. Wait for the result.</b> ${open ? 'Calls lock at their closing time, or sooner if the person who asked closes them. Whoever asked gives the result.' : 'Calls lock at their closing time, then the E-Lab team settles them.'}<br>
       <b>3. Climb the table.</b> You never put points in, so you can't lose anything you own. The points are set so that saying how sure you really are always scores best.<br><br>
       Points can't be bought, sold or cashed out.</div>
